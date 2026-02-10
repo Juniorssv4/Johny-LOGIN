@@ -1,6 +1,4 @@
 import streamlit as st
-import streamlit_authenticator as stauth
-import bcrypt
 import smtplib
 from email.message import EmailMessage
 from datetime import datetime
@@ -13,85 +11,88 @@ from openpyxl import load_workbook
 from pptx import Presentation
 
 # ───────────────────────────────────────────────
-# APPROVED USERS
+# APPROVED USERS (plain passwords - for testing only)
 # ───────────────────────────────────────────────
 credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': '$2b$12$examplehashedpasswordhere',  # Replace with real bcrypt hash
+            'password': 'admin123',  # plain password - change it
             'email': 'sisouvanhjunior@gmail.com'
         },
-        # Add approved users here after approval
+        'juniorssv4': {
+            'name': 'Junior SSV4',
+            'password': 'Junior76755782@',  # plain password from signup email
+            'email': 'phosis667@npaid.org'
+        }
+        # Add new users here with plain passwords:
+        # 'newuser': {
+        #     'name': 'Full Name',
+        #     'password': 'TheirPlainPassword',
+        #     'email': 'user@email.com'
+        # }
     }
 }
-
-# Authenticator setup - NO location arg to avoid error
-authenticator = stauth.Authenticate(
-    credentials=credentials,
-    cookie_name='johny_cookie',
-    key='random_johny_key_2026',
-    cookie_expiry_days=30
-)
 
 # ───────────────────────────────────────────────
 # LOGIN / SIGNUP PAGE
 # ───────────────────────────────────────────────
-st.title("Johny - Login / Sign Up")
-
 if not st.session_state.get("authentication_status"):
-    # Manual login form (no location arg)
-    st.subheader("Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    st.title("Johny - Login / Sign Up")
 
-    if st.button("Login"):
-        # Manual authentication check
-        if username in credentials['usernames']:
-            user = credentials['usernames'][username]
-            if bcrypt.checkpw(password.encode(), user['password'].encode()):
-                st.session_state["authentication_status"] = True
-                st.session_state["name"] = user['name']
-                st.session_state["username"] = username
-                st.success(f"Welcome {user['name']}!")
-                # Track login
-                log = f"{datetime.now()} - Login: {username}"
-                st.write(log)
+    tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
+
+    with tab_login:
+        st.subheader("Login")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+
+        if st.button("Login"):
+            if username in credentials['usernames']:
+                user = credentials['usernames'][username]
+                if password == user['password']:  # plain text comparison
+                    st.session_state["authentication_status"] = True
+                    st.session_state["name"] = user['name']
+                    st.session_state["username"] = username
+                    st.success(f"Welcome {user['name']}!")
+                    log = f"{datetime.now()} - Login: {username}"
+                    st.write(log)
+                else:
+                    st.error("Incorrect password")
             else:
-                st.error("Incorrect password")
-        else:
-            st.error("Username not found")
+                st.error("Username not found")
 
-    st.subheader("Sign Up (Request Approval)")
-    st.info("Sign up — request sent to sisouvanhjunior@gmail.com for approval.")
-    new_username = st.text_input("Choose username", key="new_user")
-    new_email = st.text_input("Your email", key="new_email")
-    new_password = st.text_input("Choose password", type="password", key="new_pass")
-    confirm_password = st.text_input("Confirm password", type="password", key="confirm_pass")
+    with tab_signup:
+        st.subheader("Sign Up (Request Approval)")
+        st.info("Sign up — request sent to sisouvanhjunior@gmail.com for approval.")
+        new_username = st.text_input("Choose username")
+        new_email = st.text_input("Your email")
+        new_password = st.text_input("Choose password", type="password")
+        confirm_password = st.text_input("Confirm password", type="password")
 
-    if st.button("Sign Up"):
-        if new_password != confirm_password:
-            st.error("Passwords do not match")
-        elif new_username in credentials['usernames']:
-            st.error("Username already taken")
-        else:
-            msg = EmailMessage()
-            msg['Subject'] = "New Johny Signup Request"
-            msg['From'] = st.secrets["EMAIL_USER"]
-            msg['To'] = "sisouvanhjunior@gmail.com"
-            msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword: {new_password}\nApprove by adding to credentials.")
+        if st.button("Sign Up"):
+            if new_password != confirm_password:
+                st.error("Passwords do not match")
+            elif new_username in credentials['usernames']:
+                st.error("Username already taken")
+            else:
+                msg = EmailMessage()
+                msg['Subject'] = "New Johny Signup Request"
+                msg['From'] = st.secrets["EMAIL_USER"]
+                msg['To'] = "sisouvanhjunior@gmail.com"
+                msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword: {new_password}\nApprove by adding to credentials['usernames'] with plain password.")
 
-            try:
-                with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-                    smtp.login(st.secrets["EMAIL_USER"], st.secrets["EMAIL_PASS"])
-                    smtp.send_message(msg)
-                st.success("Request sent! Wait for approval.")
-            except Exception as e:
-                st.error(f"Email failed: {str(e)}")
+                try:
+                    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+                        smtp.login(st.secrets["EMAIL_USER"], st.secrets["EMAIL_PASS"])
+                        smtp.send_message(msg)
+                    st.success("Request sent! Wait for admin approval.")
+                except Exception as e:
+                    st.error(f"Email failed: {str(e)}")
 
 else:
     # ───────────────────────────────────────────────
-    # TRANSLATOR (after login)
+    # JOHNY TRANSLATOR (after login)
     # ───────────────────────────────────────────────
 
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
@@ -279,4 +280,7 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
-    authenticator.logout('Logout', 'main')
+    # Logout button
+    if st.button("Logout"):
+        st.session_state["authentication_status"] = False
+        st.rerun()
