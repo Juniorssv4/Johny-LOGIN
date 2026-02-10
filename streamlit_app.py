@@ -18,19 +18,19 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this
+            'password': 'admin123',  # change this to a secure one
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',
+            'password': 'Junior76755782@',  # exact from your signup
             'email': 'phosis667@npaid.org'
         }
         # Add new users here with plain passwords
     }
 }
 
-# Cookie manager for remember me
+# Cookie manager for persistent login
 cookie_manager = stx.CookieManager(key='johny_cookie_manager')
 
 # Check if user is already logged in via cookie
@@ -290,7 +290,7 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
-    # Logout button (1-click, clears cookie and session)
+    # Logout button (1-click, clears cookie)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
         cookie_manager.delete('johny_logged_in')
