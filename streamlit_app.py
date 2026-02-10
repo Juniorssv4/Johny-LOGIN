@@ -18,19 +18,24 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this to a secure one
+            'password': 'admin123',  # change this to a real password
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',  # exact from your signup
+            'password': 'Junior76755782@',  # plain password from signup email
             'email': 'phosis667@npaid.org'
         }
-        # Add new users here with plain passwords
+        # Add new users here with plain passwords:
+        # 'newuser': {
+        #     'name': 'Full Name',
+        #     'password': 'TheirPlainPassword',
+        #     'email': 'user@email.com'
+        # }
     }
 }
 
-# Cookie manager for persistent login
+# Cookie manager for remember me
 cookie_manager = stx.CookieManager(key='johny_cookie_manager')
 
 # Check if user is already logged in via cookie
@@ -66,7 +71,7 @@ if not st.session_state.get("authentication_status"):
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
-                    st.rerun()  # 1-click success
+                    st.rerun()  # Instant 1-click reload to show translator
                 else:
                     st.error("Incorrect password")
             else:
@@ -290,7 +295,7 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
-    # Logout button (1-click, clears cookie)
+    # Logout button (1-click, clears cookie and session)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
         cookie_manager.delete('johny_logged_in')
