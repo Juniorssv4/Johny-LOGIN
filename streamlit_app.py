@@ -17,20 +17,27 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',
+            'password': 'admin123',  # change this to a real password
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',
+            'password': 'Junior76755782@',  # plain password from signup email
             'email': 'phosis667@npaid.org'
         }
         # Add new users here with plain passwords
     }
 }
 
+# Check if user is already logged in via URL param
+params = st.experimental_get_query_params()
+if 'logged_in' in params and params['logged_in'][0] in credentials['usernames']:
+    st.session_state["authentication_status"] = True
+    st.session_state["name"] = credentials['usernames'][params['logged_in'][0]]['name']
+    st.session_state["username"] = params['logged_in'][0]
+
 # ───────────────────────────────────────────────
-# LOGIN / SIGNUP PAGE
+# LOGIN / SIGN UP PAGE
 # ───────────────────────────────────────────────
 if not st.session_state.get("authentication_status"):
     st.title("Johny - Login / Sign Up")
@@ -49,10 +56,12 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
+                    # Set URL param for persistence (survives refresh/close)
+                    st.experimental_set_query_params(logged_in=[username])
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
-                    st.rerun()  # 1-click success
+                    st.rerun()  # Instant 1-click reload to show translator
                 else:
                     st.error("Incorrect password")
             else:
@@ -276,7 +285,11 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
-    # Logout button (1-click, instant return to login)
+    # Logout button (1-click, clears cookie and session)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
-        st.rerun()  # Instant logout
+        cookie_manager.delete('johny_logged_in')
+        st.rerun()
+
+else:
+    st.warning("Please log in to access the translator.")
