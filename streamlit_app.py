@@ -286,3 +286,6 @@ Text: {text}"""
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
         st.rerun()
+
+else:
+    st.warning("Please log in to access the translator.")
