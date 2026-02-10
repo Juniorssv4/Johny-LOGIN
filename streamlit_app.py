@@ -1,5 +1,6 @@
 import streamlit as st
 import streamlit_authenticator as stauth
+import yaml
 import smtplib
 from email.message import EmailMessage
 from datetime import datetime
@@ -12,25 +13,19 @@ from openpyxl import load_workbook
 from pptx import Presentation
 
 # ───────────────────────────────────────────────
-# APPROVED USERS (plain passwords – testing only)
+# LOAD USERS FROM users.yaml (plain passwords – testing only)
 # ───────────────────────────────────────────────
-credentials = {
-    'usernames': {
-        'admin': {
-            'name': 'Admin',
-            'password': 'admin123',
-            'email': 'sisouvanhjunior@gmail.com'
-        },
-        'juniorssv4': {
-            'name': 'Junior SSV4',
-            'password': 'Junior76755782@',
-            'email': 'phosis667@npaid.org'
-        }
-        # Add more users here with plain passwords
-    }
-}
+try:
+    with open("users.yaml", "r") as file:
+        credentials = yaml.safe_load(file)
+except FileNotFoundError:
+    st.error("users.yaml file not found. Please create it in the repo with usernames.")
+    st.stop()
+except Exception as e:
+    st.error(f"Error loading users.yaml: {str(e)}")
+    st.stop()
 
-# Authenticator setup – use 'main' location to fix error
+# Authenticator with cookie for remember me (30 days)
 authenticator = stauth.Authenticate(
     credentials=credentials,
     cookie_name='johny_remember_me',
@@ -41,7 +36,7 @@ authenticator = stauth.Authenticate(
 # ───────────────────────────────────────────────
 # LOGIN / SIGNUP PAGE
 # ───────────────────────────────────────────────
-name, authentication_status, username = authenticator.login('Login', 'main')  # ← 'main' fixes ValueError
+name, authentication_status, username = authenticator.login('Login', 'main')  # 'main' fixes location error
 
 if authentication_status:
     st.success(f"Welcome {name}!")
