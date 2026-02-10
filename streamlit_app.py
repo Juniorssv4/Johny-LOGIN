@@ -9,6 +9,8 @@ from io import BytesIO
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
+import json
+import base64
 
 # ───────────────────────────────────────────────
 # APPROVED USERS (plain passwords – testing/private use only)
@@ -17,17 +19,61 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this to a real password
+            'password': 'admin123',  # change this
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',  # plain password from signup email
+            'password': 'Junior76755782@',
             'email': 'phosis667@npaid.org'
         }
         # Add new users here with plain passwords
     }
 }
+
+# GitHub API setup for login persistence (separate repo)
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+GITHUB_REPO = st.secrets["GITHUB_REPO"]
+GITHUB_FILE = 'logins.json'  # File in the separate repo
+
+# Get user IP (for device tracking)
+def get_user_ip():
+    return requests.get('https://api.ipify.org').text
+
+# Load logins from GitHub repo
+def load_logins():
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        content = response.json()['content']
+        return json.loads(base64.b64decode(content))
+    else:
+        return {}
+
+# Save logins to GitHub repo
+def save_logins(logins):
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Content-Type": "application/json"}
+    response = requests.get(url, headers=headers)
+    sha = response.json()['sha'] if response.status_code == 200 else None
+    content = base64.b64encode(json.dumps(logins).encode()).decode()
+    data = {
+        "message": "Update logins.json",
+        "content": content,
+        "sha": sha if sha else None
+    }
+    requests.put(url, headers=headers, json=data)
+
+# Check if current IP is logged in
+logins = load_logins()
+user_ip = get_user_ip()
+if user_ip in logins:
+    logged_in_username = logins[user_ip]
+    if logged_in_username in credentials['usernames']:
+        st.session_state["authentication_status"] = True
+        st.session_state["name"] = credentials['usernames'][logged_in_username]['name']
+        st.session_state["username"] = logged_in_username
 
 # ───────────────────────────────────────────────
 # LOGIN / SIGN UP PAGE
@@ -41,7 +87,6 @@ if not st.session_state.get("authentication_status"):
         st.subheader("Login")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
-        remember_me = st.checkbox("Remember me (30 days)")
 
         if st.button("Login"):
             if username in credentials['usernames']:
@@ -50,15 +95,12 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
-                    if remember_me:
-                        # Set localStorage for persistence (survives refresh/close)
-                        st.components.v1.html(f"""
-                            <script>
-                            localStorage.setItem('johny_logged_in', '{username}');
-                            </script>
-                        """, height=0)
+                    # Record IP in separate repo for persistence
+                    logins = load_logins()
+                    logins[user_ip] = username
+                    save_logins(logins)
                     st.success(f"Welcome {user['name']}! Loading translator...")
-                    log = f"{datetime.now()} - Login: {username}"
+                    log = f"{datetime.now()} - Login: {username} (IP: {user_ip})"
                     st.write(log)
                     st.rerun()  # Instant 1-click reload to show translator
                 else:
