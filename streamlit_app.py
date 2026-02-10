@@ -35,7 +35,7 @@ def safe_generate_content(prompt):
 # Glossary from repo file
 if "glossary" not in st.session_state:
     try:
-        raw_url = "https://raw.githubusercontent.com/Juniorssv4/johny-final/main/glossary.txt"
+        raw_url = "https://raw.githubusercontent.com/Juniorssv4/johny-LOGIN/main/glossary.txt"
         response = requests.get(raw_url)
         response.raise_for_status()
         lines = response.text.splitlines()
