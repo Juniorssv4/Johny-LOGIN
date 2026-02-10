@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit_authenticator as stauth
 import smtplib
 from email.message import EmailMessage
 from datetime import datetime
@@ -17,78 +18,44 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this
+            'password': 'admin123',
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',  # exact from your signup email
+            'password': 'Junior76755782@',
             'email': 'phosis667@npaid.org'
         }
         # Add more users here with plain passwords
     }
 }
 
+# Authenticator with cookie for remember me (30 days)
+authenticator = stauth.Authenticate(
+    credentials=credentials,
+    cookie_name='johny_remember_me_cookie',
+    key='random_johny_key_2026_change_if_needed',
+    cookie_expiry_days=30
+)
+
 # ───────────────────────────────────────────────
 # LOGIN / SIGNUP PAGE
 # ───────────────────────────────────────────────
-if not st.session_state.get("authentication_status"):
-    st.title("Johny - Login / Sign Up")
+name, authentication_status, username = authenticator.login('Login', 'main')
 
-    tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
+if authentication_status:
+    # Logged in – show translator
+    st.success(f"Welcome {name}!")
 
-    with tab_login:
-        st.subheader("Login")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+    # Track login (optional)
+    log = f"{datetime.now()} - Login: {username}"
+    # st.write(log)  # uncomment if you want to show log
 
-        if st.button("Login"):
-            if username in credentials['usernames']:
-                user = credentials['usernames'][username]
-                if password == user['password']:
-                    st.session_state["authentication_status"] = True
-                    st.session_state["name"] = user['name']
-                    st.session_state["username"] = username
-                    st.success(f"Welcome {user['name']}! Loading translator...")
-                    log = f"{datetime.now()} - Login: {username}"
-                    st.write(log)
-                    st.rerun()  # 1-click success
-                else:
-                    st.error("Incorrect password")
-            else:
-                st.error("Username not found")
+    # Logout button (1-click, instant)
+    authenticator.logout('Logout', 'main')
 
-    with tab_signup:
-        st.subheader("Sign Up (Request Approval)")
-        st.info("Sign up — request sent to sisouvanhjunior@gmail.com for approval.")
-        new_username = st.text_input("Choose username")
-        new_email = st.text_input("Your email")
-        new_password = st.text_input("Choose password", type="password")
-        confirm_password = st.text_input("Confirm password", type="password")
-
-        if st.button("Sign Up"):
-            if new_password != confirm_password:
-                st.error("Passwords do not match")
-            elif new_username in credentials['usernames']:
-                st.error("Username already taken")
-            else:
-                msg = EmailMessage()
-                msg['Subject'] = "New Johny Signup Request"
-                msg['From'] = st.secrets["EMAIL_USER"]
-                msg['To'] = "sisouvanhjunior@gmail.com"
-                msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword: {new_password}\nApprove by adding to credentials['usernames'] with plain password.")
-
-                try:
-                    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-                        smtp.login(st.secrets["EMAIL_USER"], st.secrets["EMAIL_PASS"])
-                        smtp.send_message(msg)
-                    st.success("Request sent! Wait for admin approval.")
-                except Exception as e:
-                    st.error(f"Email failed: {str(e)}")
-
-else:
     # ───────────────────────────────────────────────
-    # JOHNY TRANSLATOR (after login)
+    # JOHNY TRANSLATOR
     # ───────────────────────────────────────────────
 
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
@@ -276,9 +243,5 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
-    # Logout button (1-click, instant return to login)
-    if st.button("Logout"):
-        st.session_state["authentication_status"] = False
-        st.session_state.pop("name", None)
-        st.session_state.pop("username", None)
-        st.rerun()  # Instant logout
+else:
+    st.warning("Please log in to access the translator.")
