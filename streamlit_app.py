@@ -30,7 +30,7 @@ credentials = {
     }
 }
 
-# Authenticator (no location arg – fixes the error)
+# Authenticator setup – use 'main' location to fix error
 authenticator = stauth.Authenticate(
     credentials=credentials,
     cookie_name='johny_remember_me',
@@ -41,7 +41,7 @@ authenticator = stauth.Authenticate(
 # ───────────────────────────────────────────────
 # LOGIN / SIGNUP PAGE
 # ───────────────────────────────────────────────
-name, authentication_status, username = authenticator.login('Login')  # ← No second arg – this fixes ValueError
+name, authentication_status, username = authenticator.login('Login', 'main')  # ← 'main' fixes ValueError
 
 if authentication_status:
     st.success(f"Welcome {name}!")
