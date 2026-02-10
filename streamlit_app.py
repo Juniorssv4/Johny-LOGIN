@@ -295,3 +295,5 @@ Text: {text}"""
         st.session_state["authentication_status"] = False
         cookie_manager.delete('johny_logged_in')
         st.rerun()
+else:
+    st.warning("Please log in to access the translator.")
