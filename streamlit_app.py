@@ -25,17 +25,12 @@ credentials = {
             'password': 'Junior76755782@',  # plain password from signup email
             'email': 'phosis667@npaid.org'
         }
-        # Add new users here with plain passwords:
-        # 'newuser': {
-        #     'name': 'Full Name',
-        #     'password': 'TheirPlainPassword',
-        #     'email': 'user@email.com'
-        # }
+        # Add new users here with plain passwords
     }
 }
 
 # ───────────────────────────────────────────────
-# LOGIN / SIGNUP PAGE
+# LOGIN / SIGN UP PAGE
 # ───────────────────────────────────────────────
 if not st.session_state.get("authentication_status"):
     st.title("Johny - Login / Sign Up")
@@ -46,14 +41,22 @@ if not st.session_state.get("authentication_status"):
         st.subheader("Login")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
+        remember_me = st.checkbox("Remember me (30 days)")
 
         if st.button("Login"):
             if username in credentials['usernames']:
                 user = credentials['usernames'][username]
-                if password == user['password']:  # plain text comparison
+                if password == user['password']:
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
+                    if remember_me:
+                        # Set localStorage for persistence (survives refresh/close)
+                        st.components.v1.html(f"""
+                            <script>
+                            localStorage.setItem('johny_logged_in', '{username}');
+                            </script>
+                        """, height=0)
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
