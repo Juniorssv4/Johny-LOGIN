@@ -17,7 +17,7 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this
+            'password': 'admin123',
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
@@ -28,14 +28,6 @@ credentials = {
         # Add new users here with plain passwords
     }
 }
-
-# Check if user is already logged in via URL param (survives refresh)
-params = st.query_params
-logged_in_user = params.get('logged_in', [None])[0]
-if logged_in_user and logged_in_user in credentials['usernames']:
-    st.session_state["authentication_status"] = True
-    st.session_state["name"] = credentials['usernames'][logged_in_user]['name']
-    st.session_state["username"] = logged_in_user
 
 # ───────────────────────────────────────────────
 # LOGIN / SIGN UP PAGE
@@ -57,12 +49,10 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
-                    # Set URL param for persistence (survives refresh/close)
-                    st.query_params['logged_in'] = username
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
-                    st.rerun()  # Instant 1-click reload to show translator
+                    st.rerun()  # 1-click success
                 else:
                     st.error("Incorrect password")
             else:
@@ -286,10 +276,7 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
-    # Logout button (1-click, removes param and reruns)
+    # Logout button (1-click, instant return to login)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
-        st.query_params.clear()  # Remove all params (logged_in gone)
         st.rerun()
-else:
-    st.warning("Please log in to access the translator.")
