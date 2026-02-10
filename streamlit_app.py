@@ -18,20 +18,15 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this to a real password
+            'password': 'admin123',  # change this
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',  # plain password from signup email
+            'password': 'Junior76755782@',
             'email': 'phosis667@npaid.org'
         }
-        # Add new users here with plain passwords:
-        # 'newuser': {
-        #     'name': 'Full Name',
-        #     'password': 'TheirPlainPassword',
-        #     'email': 'user@email.com'
-        # }
+        # Add new users here with plain passwords
     }
 }
 
