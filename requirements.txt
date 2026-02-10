@@ -8,3 +8,4 @@ tenacity
 requests
 streamlit-authenticator
 bcrypt
+extra-streamlit-components
