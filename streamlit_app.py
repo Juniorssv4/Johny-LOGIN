@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit_authenticator as stauth
 import smtplib
 from email.message import EmailMessage
 from datetime import datetime
@@ -12,38 +11,30 @@ from openpyxl import load_workbook
 from pptx import Presentation
 
 # ───────────────────────────────────────────────
-# APPROVED USERS (plain passwords – testing only)
+# APPROVED USERS (plain passwords – testing/private use only)
 # ───────────────────────────────────────────────
 credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change to real password
+            'password': 'admin123',  # change this
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',  # plain password from signup
+            'password': 'Junior76755782@',  # exact from your signup email
             'email': 'phosis667@npaid.org'
         }
         # Add more users here with plain passwords
     }
 }
 
-# Authenticator setup – no location arg to avoid error
-authenticator = stauth.Authenticate(
-    credentials=credentials,
-    cookie_name='johny_remember_me',
-    key='random_johny_key_2026',
-    cookie_expiry_days=30  # Remember me for 30 days
-)
-
 # ───────────────────────────────────────────────
 # LOGIN / SIGNUP PAGE
 # ───────────────────────────────────────────────
-st.title("Johny - Login / Sign Up")
-
 if not st.session_state.get("authentication_status"):
+    st.title("Johny - Login / Sign Up")
+
     tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
 
     with tab_login:
@@ -59,7 +50,9 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
                     st.success(f"Welcome {user['name']}! Loading translator...")
-                    st.rerun()  # 1-click success – reloads to translator
+                    log = f"{datetime.now()} - Login: {username}"
+                    st.write(log)
+                    st.rerun()  # 1-click success
                 else:
                     st.error("Incorrect password")
             else:
@@ -283,7 +276,9 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
-    # Logout button
+    # Logout button (1-click, instant return to login)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
-        st.rerun()
+        st.session_state.pop("name", None)
+        st.session_state.pop("username", None)
+        st.rerun()  # Instant logout
