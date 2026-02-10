@@ -18,15 +18,20 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this
+            'password': 'admin123',  # change this to a real password
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',
+            'password': 'Junior76755782@',  # plain password from signup email
             'email': 'phosis667@npaid.org'
         }
-        # Add new users here with plain passwords
+        # Add new users here with plain passwords:
+        # 'newuser': {
+        #     'name': 'Full Name',
+        #     'password': 'TheirPlainPassword',
+        #     'email': 'user@email.com'
+        # }
     }
 }
 
@@ -41,7 +46,7 @@ if logged_in_cookie and logged_in_cookie in credentials['usernames']:
     st.session_state["username"] = logged_in_cookie
 
 # ───────────────────────────────────────────────
-# LOGIN / SIGNUP PAGE
+# LOGIN / SIGN UP PAGE
 # ───────────────────────────────────────────────
 if not st.session_state.get("authentication_status"):
     st.title("Johny - Login / Sign Up")
@@ -66,7 +71,7 @@ if not st.session_state.get("authentication_status"):
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
-                    st.rerun()  # 1-click success
+                    st.rerun()  # Instant 1-click reload to show translator
                 else:
                     st.error("Incorrect password")
             else:
