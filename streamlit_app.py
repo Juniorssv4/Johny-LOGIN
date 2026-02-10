@@ -4,28 +4,35 @@ import bcrypt
 import smtplib
 from email.message import EmailMessage
 from datetime import datetime
+import google.generativeai as genai
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
+import requests
+from io import BytesIO
+from docx import Document
+from openpyxl import load_workbook
+from pptx import Presentation
 
 # ───────────────────────────────────────────────
-# APPROVED USERS (correct format for streamlit-authenticator)
+# APPROVED USERS (add here after you approve them)
 # ───────────────────────────────────────────────
 credentials = {
     'usernames': {
-        # Example starter user - replace or delete after testing
+        # Example starter user - replace or delete
         'admin': {
             'name': 'Admin',
-            'password': '$2b$12$examplehashedpasswordhere',  # Replace with real bcrypt hash
+            'password': '$2b$12$examplehashedpasswordhere',  # Replace with real hash
             'email': 'sisouvanhjunior@gmail.com'
         },
-        # Add approved users here after you get email requests:
+        # Add approved users here after email requests:
         # 'newuser': {
         #     'name': 'Full Name',
-        #     'password': '$2b$12$hashed_password_from_tool',
+        #     'password': '$2b$12$hashed_password',
         #     'email': 'user@email.com'
         # }
     }
 }
 
-# Authenticator setup
+# Authenticator setup - use 'sidebar' to fix the error
 authenticator = stauth.Authenticate(
     credentials=credentials,
     cookie_name='johny_cookie',
@@ -34,59 +41,56 @@ authenticator = stauth.Authenticate(
 )
 
 # ───────────────────────────────────────────────
-# LOGIN / SIGNUP PAGE
+# LOGIN / SIGNUP
 # ───────────────────────────────────────────────
 if not st.session_state.get("authentication_status"):
-    tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
+    # Sidebar login form (this avoids the ValueError)
+    name, authentication_status, username = authenticator.login('Login', 'sidebar')
 
-    with tab_login:
-        name, authentication_status, username = authenticator.login('Login', 'main')
-        if authentication_status:
-            st.success(f"Welcome {name}!")
-            # Track login (shown for now)
-            log = f"{datetime.now()} - Login: {username}"
-            st.write(log)
-            authenticator.logout('Logout', 'sidebar')
-        elif authentication_status == False:
-            st.error('Username/password incorrect')
-        elif authentication_status == None:
-            st.warning('Enter username and password')
+    if authentication_status:
+        st.success(f"Welcome {name}!")
+        # Track login
+        log = f"{datetime.now()} - Login: {username}"
+        st.write(log)  # Shown in app - can email later if needed
+        authenticator.logout('Logout', 'sidebar')
+    elif authentication_status == False:
+        st.error('Username/password incorrect')
+    elif authentication_status == None:
+        st.warning('Please enter username and password in the sidebar')
 
-    with tab_signup:
-        st.info("Sign up — your request will be sent to admin (sisouvanhjunior@gmail.com) for approval.")
-        new_username = st.text_input("Choose username")
-        new_email = st.text_input("Your email")
-        new_password = st.text_input("Choose password", type="password")
-        confirm_password = st.text_input("Confirm password", type="password")
+    # Sign Up section (below sidebar login)
+    st.subheader("Sign Up (Request Approval)")
+    st.info("Sign up — your request will be sent to admin (sisouvanhjunior@gmail.com) for approval.")
+    new_username = st.text_input("Choose username")
+    new_email = st.text_input("Your email")
+    new_password = st.text_input("Choose password", type="password")
+    confirm_password = st.text_input("Confirm password", type="password")
 
-        if st.button("Sign Up"):
-            if new_password != confirm_password:
-                st.error("Passwords do not match")
-            elif new_username in credentials['usernames']:
-                st.error("Username already taken")
-            else:
-                # Send approval request to you
-                msg = EmailMessage()
-                msg['Subject'] = "New Johny Signup Request"
-                msg['From'] = st.secrets["EMAIL_USER"]
-                msg['To'] = "sisouvanhjunior@gmail.com"
-                msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword (plain): {new_password}\n\nApprove by adding to 'credentials['usernames']' dict with hashed password.")
+    if st.button("Sign Up"):
+        if new_password != confirm_password:
+            st.error("Passwords do not match")
+        elif new_username in credentials['usernames']:
+            st.error("Username already taken")
+        else:
+            # Send approval request to you
+            msg = EmailMessage()
+            msg['Subject'] = "New Johny Signup Request"
+            msg['From'] = st.secrets["EMAIL_USER"]
+            msg['To'] = "sisouvanhjunior@gmail.com"
+            msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword (plain): {new_password}\n\nApprove by adding to 'credentials['usernames']' with hashed password.")
 
-                try:
-                    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-                        smtp.login(st.secrets["EMAIL_USER"], st.secrets["EMAIL_PASS"])
-                        smtp.send_message(msg)
-                    st.success("Request sent! Wait for admin approval.")
-                except Exception as e:
-                    st.error(f"Email failed: {str(e)}")
+            try:
+                with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+                    smtp.login(st.secrets["EMAIL_USER"], st.secrets["EMAIL_PASS"])
+                    smtp.send_message(msg)
+                st.success("Request sent! Wait for admin approval.")
+            except Exception as e:
+                st.error(f"Email failed: {str(e)}")
 
 else:
     # ───────────────────────────────────────────────
-    # YOUR JOHNY TRANSLATOR CODE (after login)
+    # JOHNY TRANSLATOR (only after login)
     # ───────────────────────────────────────────────
-
-    import google.generativeai as genai
-    from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 
     # GEMINI CONFIG
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
