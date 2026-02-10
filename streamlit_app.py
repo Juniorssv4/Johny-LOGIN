@@ -22,11 +22,11 @@ credentials = {
             'password': '$2b$12$examplehashedpasswordhere',  # Replace with real bcrypt hash
             'email': 'sisouvanhjunior@gmail.com'
         },
-        # Add approved users here after email requests
+        # Add approved users here after approval
     }
 }
 
-# Authenticator setup
+# Authenticator setup - NO location arg to avoid error
 authenticator = stauth.Authenticate(
     credentials=credentials,
     cookie_name='johny_cookie',
@@ -35,47 +35,51 @@ authenticator = stauth.Authenticate(
 )
 
 # ───────────────────────────────────────────────
-# MANUAL SIDEBAR LOGIN FORM (avoids ValueError)
+# LOGIN / SIGNUP PAGE
 # ───────────────────────────────────────────────
-with st.sidebar:
-    st.title("Johny Login")
-    if st.session_state.get("authentication_status"):
-        st.success(f"Welcome {st.session_state['name']}!")
-        authenticator.logout('Logout', 'sidebar')
-    else:
-        # Login form in sidebar
-        authenticator.login('Login', 'main')  # No location arg here - form is already in sidebar
+st.title("Johny - Login / Sign Up")
 
-        if st.session_state.get("authentication_status"):
-            log = f"{datetime.now()} - Login: {st.session_state['username']}"
-            st.write(log)
-        elif st.session_state.get("authentication_status") == False:
-            st.error('Username/password incorrect')
-        elif st.session_state.get("authentication_status") == None:
-            st.warning('Enter username and password above')
-
-# ───────────────────────────────────────────────
-# SIGN UP (only show if not logged in)
-# ───────────────────────────────────────────────
 if not st.session_state.get("authentication_status"):
+    # Manual login form (no location arg)
+    st.subheader("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        # Manual authentication check
+        if username in credentials['usernames']:
+            user = credentials['usernames'][username]
+            if bcrypt.checkpw(password.encode(), user['password'].encode()):
+                st.session_state["authentication_status"] = True
+                st.session_state["name"] = user['name']
+                st.session_state["username"] = username
+                st.success(f"Welcome {user['name']}!")
+                # Track login
+                log = f"{datetime.now()} - Login: {username}"
+                st.write(log)
+            else:
+                st.error("Incorrect password")
+        else:
+            st.error("Username not found")
+
     st.subheader("Sign Up (Request Approval)")
     st.info("Sign up — request sent to sisouvanhjunior@gmail.com for approval.")
-    new_username = st.text_input("Choose username")
-    new_email = st.text_input("Your email")
-    new_password = st.text_input("Choose password", type="password")
-    confirm_password = st.text_input("Confirm password", type="password")
+    new_username = st.text_input("Choose username", key="new_user")
+    new_email = st.text_input("Your email", key="new_email")
+    new_password = st.text_input("Choose password", type="password", key="new_pass")
+    confirm_password = st.text_input("Confirm password", type="password", key="confirm_pass")
 
     if st.button("Sign Up"):
         if new_password != confirm_password:
             st.error("Passwords do not match")
         elif new_username in credentials['usernames']:
-            st.error("Username taken")
+            st.error("Username already taken")
         else:
             msg = EmailMessage()
             msg['Subject'] = "New Johny Signup Request"
             msg['From'] = st.secrets["EMAIL_USER"]
             msg['To'] = "sisouvanhjunior@gmail.com"
-            msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword: {new_password}\nApprove by adding to code.")
+            msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword: {new_password}\nApprove by adding to credentials.")
 
             try:
                 with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
@@ -85,11 +89,11 @@ if not st.session_state.get("authentication_status"):
             except Exception as e:
                 st.error(f"Email failed: {str(e)}")
 
-# ───────────────────────────────────────────────
-# TRANSLATOR (only after login)
-# ───────────────────────────────────────────────
-if st.session_state.get("authentication_status"):
-    # GEMINI CONFIG
+else:
+    # ───────────────────────────────────────────────
+    # TRANSLATOR (after login)
+    # ───────────────────────────────────────────────
+
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     PRIMARY_MODEL = "gemini-2.5-flash"
     FALLBACK_MODEL = "gemini-1.5-flash"
@@ -155,12 +159,6 @@ Text: {text}"""
             st.error(f"API error: {str(e)}")
             return "[Failed — try again]"
 
-    # UI
-    st.set_page_config(
-        page_title="Johny",
-        page_icon="https://raw.githubusercontent.com/Juniorssv4/Johny-LOGIN/main/Johny.png",
-        layout="centered"
-    )
     st.title("😊 Johny — NPA Lao Translator")
 
     direction = st.radio("Direction", ["English → Lao", "Lao → English"], horizontal=True)
@@ -281,4 +279,4 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
-    authenticator.logout('Logout', 'sidebar')
+    authenticator.logout('Logout', 'main')
