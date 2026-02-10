@@ -57,7 +57,7 @@ if not st.session_state.get("authentication_status"):
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
-                    st.rerun()  # ← Instant 1-click reload to show translator
+                    st.rerun()  # Instant 1-click reload to show translator
                 else:
                     st.error("Incorrect password")
             else:
@@ -281,6 +281,9 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
+    # Logout button (one click, instant return to login)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
-        st.rerun()
+        st.session_state.pop("name", None)
+        st.session_state.pop("username", None)
+        st.rerun()  # Instant logout and reload to login page
