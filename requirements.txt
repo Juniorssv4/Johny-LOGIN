@@ -6,3 +6,5 @@ python-pptx
 pdf2docx
 tenacity
 requests
+streamlit-authenticator
+bcrypt
