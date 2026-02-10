@@ -13,26 +13,26 @@ from openpyxl import load_workbook
 from pptx import Presentation
 
 # ───────────────────────────────────────────────
-# APPROVED USERS (add here after you approve them)
+# APPROVED USERS (correct format)
 # ───────────────────────────────────────────────
 credentials = {
     'usernames': {
-        # Example starter user - replace or delete
+        # Starter admin user - change password hash after testing
         'admin': {
             'name': 'Admin',
-            'password': '$2b$12$examplehashedpasswordhere',  # Replace with real hash
+            'password': '$2b$12$examplehashedpasswordhere',  # Replace with real bcrypt hash
             'email': 'sisouvanhjunior@gmail.com'
         },
-        # Add approved users here after email requests:
+        # Add approved users here:
         # 'newuser': {
         #     'name': 'Full Name',
-        #     'password': '$2b$12$hashed_password',
+        #     'password': '$2b$12$hashed',
         #     'email': 'user@email.com'
         # }
     }
 }
 
-# Authenticator setup - use 'sidebar' to fix the error
+# Authenticator setup (no location arg here - we place form manually)
 authenticator = stauth.Authenticate(
     credentials=credentials,
     cookie_name='johny_cookie',
@@ -41,26 +41,26 @@ authenticator = stauth.Authenticate(
 )
 
 # ───────────────────────────────────────────────
-# LOGIN / SIGNUP
+# PLACE LOGIN FORM IN SIDEBAR (this avoids the ValueError)
 # ───────────────────────────────────────────────
-if not st.session_state.get("authentication_status"):
-    # Sidebar login form (this avoids the ValueError)
-    name, authentication_status, username = authenticator.login('Login', 'sidebar')
+with st.sidebar:
+    st.title("Johny Login")
+    name, authentication_status, username = authenticator.login('Login', 'main')  # 'main' here is safe inside sidebar
 
     if authentication_status:
         st.success(f"Welcome {name}!")
-        # Track login
         log = f"{datetime.now()} - Login: {username}"
-        st.write(log)  # Shown in app - can email later if needed
+        st.write(log)
         authenticator.logout('Logout', 'sidebar')
     elif authentication_status == False:
         st.error('Username/password incorrect')
     elif authentication_status == None:
-        st.warning('Please enter username and password in the sidebar')
+        st.warning('Enter username and password')
 
-    # Sign Up section (below sidebar login)
+# Sign Up form (below sidebar login)
+if not st.session_state.get("authentication_status"):
     st.subheader("Sign Up (Request Approval)")
-    st.info("Sign up — your request will be sent to admin (sisouvanhjunior@gmail.com) for approval.")
+    st.info("Sign up — request sent to sisouvanhjunior@gmail.com for approval.")
     new_username = st.text_input("Choose username")
     new_email = st.text_input("Your email")
     new_password = st.text_input("Choose password", type="password")
@@ -70,28 +70,26 @@ if not st.session_state.get("authentication_status"):
         if new_password != confirm_password:
             st.error("Passwords do not match")
         elif new_username in credentials['usernames']:
-            st.error("Username already taken")
+            st.error("Username taken")
         else:
-            # Send approval request to you
             msg = EmailMessage()
             msg['Subject'] = "New Johny Signup Request"
             msg['From'] = st.secrets["EMAIL_USER"]
             msg['To'] = "sisouvanhjunior@gmail.com"
-            msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword (plain): {new_password}\n\nApprove by adding to 'credentials['usernames']' with hashed password.")
+            msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword: {new_password}\nApprove by adding to credentials.")
 
             try:
                 with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
                     smtp.login(st.secrets["EMAIL_USER"], st.secrets["EMAIL_PASS"])
                     smtp.send_message(msg)
-                st.success("Request sent! Wait for admin approval.")
+                st.success("Request sent! Wait for approval.")
             except Exception as e:
                 st.error(f"Email failed: {str(e)}")
 
-else:
-    # ───────────────────────────────────────────────
-    # JOHNY TRANSLATOR (only after login)
-    # ───────────────────────────────────────────────
-
+# ───────────────────────────────────────────────
+# TRANSLATOR (only shown after login)
+# ───────────────────────────────────────────────
+if st.session_state.get("authentication_status"):
     # GEMINI CONFIG
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     PRIMARY_MODEL = "gemini-2.5-flash"
@@ -147,12 +145,12 @@ Text: {text}"""
             if "429" in str(e.last_attempt.exception()) or "quota" in str(e.last_attempt.exception()).lower():
                 if st.session_state.current_model == PRIMARY_MODEL:
                     st.session_state.current_model = FALLBACK_MODEL
-                    st.info("Rate limit on gemini-2.5-flash — switched to gemini-1.5-flash.")
+                    st.info("Rate limit — switched to fallback model.")
                     global model
                     model = genai.GenerativeModel(FALLBACK_MODEL)
                     response = model.generate_content(prompt)
                     return response.text.strip()
-            st.error("Timed out after retries — try again in 5 minutes.")
+            st.error("Timed out — try later.")
             return "[Failed — try later]"
         except Exception as e:
             st.error(f"API error: {str(e)}")
@@ -184,7 +182,7 @@ Text: {text}"""
         if uploaded_file:
             MAX_SIZE_MB = 50
             if uploaded_file.size > MAX_SIZE_MB * 1024 * 1024:
-                st.error(f"File too large! Max allowed size is {MAX_SIZE_MB}MB. Your file is {uploaded_file.size / (1024*1024):.1f}MB.")
+                st.error(f"File too large! Max {MAX_SIZE_MB}MB. Your file: {uploaded_file.size / (1024*1024):.1f}MB.")
             elif st.button("Translate File", type="primary"):
                 with st.spinner("Translating file..."):
                     file_bytes = uploaded_file.read()
@@ -229,7 +227,7 @@ Text: {text}"""
                                             elements_list.append(("para", p))
 
                     if total_elements == 0:
-                        st.warning("No text found in file.")
+                        st.warning("No text found.")
                         st.stop()
 
                     progress_bar = st.progress(0)
@@ -264,7 +262,7 @@ Text: {text}"""
                     mime_type = "application/octet-stream"
 
                     st.success("Translation complete!")
-                    st.info("Click the button below to download your translated file.")
+                    st.info("Click below to download.")
 
                     st.download_button(
                         label="📥 DOWNLOAD TRANSLATED FILE NOW",
@@ -273,16 +271,13 @@ Text: {text}"""
                         mime=mime_type,
                         type="primary",
                         use_container_width=True,
-                        key="download_btn_" + str(time.time())
+                        key="download_" + str(time.time())
                     )
 
-                    st.caption("Tip: If nothing happens, refresh or use Chrome.")
-
-    # Teach term section
     with st.expander("➕ Teach Johny a new term (edit glossary.txt in GitHub)"):
-        st.info("To add term: Edit glossary.txt in repo → add line 'english:lao' → save → reboot app.")
-        st.code("Example:\nSamir:ສະຫມີຣ\nhello:ສະບາຍດີ")
+        st.info("Edit glossary.txt in repo → add 'english:lao' → save → app updates.")
+        st.code("Example:\nUXO:ລບຕ\nhello:ສະບາຍດີ")
 
-    st.caption(f"Active glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
+    st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
     authenticator.logout('Logout', 'sidebar')
