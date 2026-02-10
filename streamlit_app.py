@@ -17,20 +17,25 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this
+            'password': 'admin123',  # change this to a real password
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',
+            'password': 'Junior76755782@',  # plain password from signup email
             'email': 'phosis667@npaid.org'
         }
-        # Add new users here with plain passwords
+        # Add new users here with plain passwords:
+        # 'newuser': {
+        #     'name': 'Full Name',
+        #     'password': 'TheirPlainPassword',
+        #     'email': 'user@email.com'
+        # }
     }
 }
 
 # ───────────────────────────────────────────────
-# LOGIN / SIGN UP PAGE
+# LOGIN / SIGNUP PAGE
 # ───────────────────────────────────────────────
 if not st.session_state.get("authentication_status"):
     st.title("Johny - Login / Sign Up")
@@ -45,16 +50,10 @@ if not st.session_state.get("authentication_status"):
         if st.button("Login"):
             if username in credentials['usernames']:
                 user = credentials['usernames'][username]
-                if password == user['password']:
+                if password == user['password']:  # plain text comparison
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
-                    # Set localStorage for persistence (survives refresh/close)
-                    st.components.v1.html(f"""
-                        <script>
-                        localStorage.setItem('johny_logged_in', '{username}');
-                        </script>
-                    """, height=0)
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
@@ -286,6 +285,3 @@ Text: {text}"""
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
         st.rerun()
-
-else:
-    st.warning("Please log in to access the translator.")
