@@ -18,20 +18,15 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this to a real password
+            'password': 'admin123',  # change this
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',  # plain password from signup email
+            'password': 'Junior76755782@',
             'email': 'phosis667@npaid.org'
         }
-        # Add new users here with plain passwords:
-        # 'newuser': {
-        #     'name': 'Full Name',
-        #     'password': 'TheirPlainPassword',
-        #     'email': 'user@email.com'
-        # }
+        # Add new users here with plain passwords
     }
 }
 
@@ -71,7 +66,7 @@ if not st.session_state.get("authentication_status"):
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
-                    st.rerun()  # Instant 1-click reload to show translator
+                    st.rerun()  # 1-click success
                 else:
                     st.error("Incorrect password")
             else:
