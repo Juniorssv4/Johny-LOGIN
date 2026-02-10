@@ -1,7 +1,7 @@
 import streamlit as st
 import smtplib
 from email.message import EmailMessage
-from datetime import datetime
+from datetime import datetime, timedelta
 import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 import requests
@@ -9,30 +9,36 @@ from io import BytesIO
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
+import extra_streamlit_components as stx
 
 # ───────────────────────────────────────────────
-# APPROVED USERS (plain passwords – for testing/private use only)
+# APPROVED USERS (plain passwords – testing/private use only)
 # ───────────────────────────────────────────────
 credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this to a real password
+            'password': 'admin123',  # change this
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',  # plain password from signup email
+            'password': 'Junior76755782@',
             'email': 'phosis667@npaid.org'
         }
-        # Add new users here with plain passwords:
-        # 'newuser': {
-        #     'name': 'Full Name',
-        #     'password': 'TheirPlainPassword',
-        #     'email': 'user@email.com'
-        # }
+        # Add new users here with plain passwords
     }
 }
+
+# Cookie manager for remember me
+cookie_manager = stx.CookieManager(key='johny_cookie_manager')
+
+# Check if user is already logged in via cookie
+logged_in_cookie = cookie_manager.get(cookie='johny_logged_in')
+if logged_in_cookie and logged_in_cookie in credentials['usernames']:
+    st.session_state["authentication_status"] = True
+    st.session_state["name"] = credentials['usernames'][logged_in_cookie]['name']
+    st.session_state["username"] = logged_in_cookie
 
 # ───────────────────────────────────────────────
 # LOGIN / SIGNUP PAGE
@@ -46,18 +52,21 @@ if not st.session_state.get("authentication_status"):
         st.subheader("Login")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
+        remember_me = st.checkbox("Remember me (30 days)", value=True)
 
         if st.button("Login"):
             if username in credentials['usernames']:
                 user = credentials['usernames'][username]
-                if password == user['password']:  # plain text comparison
+                if password == user['password']:
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
+                    if remember_me:
+                        cookie_manager.set('johny_logged_in', username, expires_at=datetime.now() + timedelta(days=30))
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
-                    st.rerun()  # Instant 1-click reload to show translator
+                    st.rerun()  # 1-click success
                 else:
                     st.error("Incorrect password")
             else:
@@ -281,9 +290,8 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
-    # Logout button (one click, instant return to login)
+    # Logout button (1-click, clears cookie and session)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
-        st.session_state.pop("name", None)
-        st.session_state.pop("username", None)
-        st.rerun()  # Instant logout and reload to login page
+        cookie_manager.delete('johny_logged_in')
+        st.rerun()
