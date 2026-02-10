@@ -32,7 +32,7 @@ credentials = {
     }
 }
 
-# GitHub API setup
+# GitHub API setup (your separate database repo)
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 GITHUB_REPO = st.secrets["GITHUB_REPO"]
 GITHUB_FILE = 'logins.json'
@@ -57,9 +57,9 @@ def save_logins(logins):
     data = {"message": "Update logins.json", "content": content, "sha": sha}
     requests.put(url, headers=headers, json=data)
 
-# Get persistent device ID from localStorage (create if not exists)
+# Get persistent device ID from localStorage (create once)
 def get_device_id():
-    # Use JS to read/create persistent ID in localStorage
+    # Use JS to read/create persistent ID
     st.components.v1.html("""
         <script>
         let deviceId = localStorage.getItem('johny_device_id');
@@ -71,7 +71,7 @@ def get_device_id():
         </script>
     """, height=0)
 
-    # Fallback in Python if JS not yet run
+    # Fallback in Python if JS not run yet
     if 'device_id' not in st.session_state:
         st.session_state['device_id'] = str(uuid.uuid4())
     return st.session_state['device_id']
@@ -107,7 +107,7 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
-                    # Save device ID in repo
+                    # Save device ID in GitHub repo
                     logins = load_logins()
                     logins[device_id] = username
                     save_logins(logins)
@@ -216,7 +216,7 @@ Text: {text}"""
             return "[Failed — try later]"
         except Exception as e:
             st.error(f"API error: {str(e)}")
-            return "[Failed — try again]"
+            return "[Failed — try later]"
 
     st.title("😊 Johny — NPA Lao Translator")
 
