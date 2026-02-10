@@ -12,6 +12,7 @@ from pptx import Presentation
 import json
 import base64
 import hashlib
+import time
 
 # ───────────────────────────────────────────────
 # APPROVED USERS (plain passwords – testing/private use only)
@@ -37,8 +38,9 @@ GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 GITHUB_REPO = st.secrets["GITHUB_REPO"]
 GITHUB_FILE = 'logins.json'  # File in the separate repo
 
-# Generate unique device ID (simple hash of browser info)
+# Generate unique device ID (stronger fingerprint + random salt)
 def get_device_id():
+    # Base fingerprint from browser info
     fingerprint = ""
     try:
         fingerprint += st.user_agent or ""
@@ -46,8 +48,21 @@ def get_device_id():
         fingerprint += str(st.session_state.get('screen_height', 0))
         fingerprint += str(st.session_state.get('language', ''))
         fingerprint += str(st.session_state.get('timezone', ''))
+        # Add JS info for more uniqueness
+        st.components.v1.html("""
+            <script>
+            window.parent.postMessage({
+                type: 'fingerprint',
+                value: navigator.userAgent + screen.width + screen.height + navigator.language + Intl.DateTimeFormat().resolvedOptions().timeZone + navigator.hardwareConcurrency + navigator.deviceMemory
+            }, "*");
+            </script>
+        """, height=0)
     except:
         fingerprint = "default"
+    # Add random salt (generated once)
+    if 'device_salt' not in st.session_state:
+        st.session_state['device_salt'] = str(time.time()) + str(hash(str(fingerprint)))
+    fingerprint += st.session_state['device_salt']
     return hashlib.sha256(fingerprint.encode()).hexdigest()[:32]
 
 # Load logins from GitHub repo
