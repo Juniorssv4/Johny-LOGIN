@@ -17,7 +17,7 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this
+            'password': 'admin123',
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
@@ -276,10 +276,7 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
-    # Logout button (1-click, removes param and reruns)
+    # Logout button (1-click, instant return to login)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
-        st.experimental_set_query_params(logged_in=None)
         st.rerun()
-else:
-    st.warning("Please log in to access the translator.")
