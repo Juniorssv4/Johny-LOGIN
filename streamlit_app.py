@@ -17,12 +17,12 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this to a real password
+            'password': 'admin123',  # change this
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',  # plain password from signup email
+            'password': 'Junior76755782@',
             'email': 'phosis667@npaid.org'
         }
         # Add new users here with plain passwords
@@ -30,7 +30,7 @@ credentials = {
 }
 
 # ───────────────────────────────────────────────
-# LOGIN / SIGNUP PAGE
+# LOGIN / SIGN UP PAGE
 # ───────────────────────────────────────────────
 if not st.session_state.get("authentication_status"):
     st.title("Johny - Login / Sign Up")
