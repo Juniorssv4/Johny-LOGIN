@@ -12,7 +12,7 @@ from openpyxl import load_workbook
 from pptx import Presentation
 
 # ───────────────────────────────────────────────
-# APPROVED USERS (plain passwords – testing/private use only)
+# APPROVED USERS (plain passwords – testing only)
 # ───────────────────────────────────────────────
 credentials = {
     'usernames': {
@@ -30,28 +30,23 @@ credentials = {
     }
 }
 
-# Authenticator with cookie for remember me (30 days)
+# Authenticator (no location arg – fixes the error)
 authenticator = stauth.Authenticate(
     credentials=credentials,
-    cookie_name='johny_remember_me_cookie',
-    key='random_johny_key_2026_change_if_needed',
+    cookie_name='johny_remember_me',
+    key='random_johny_key_2026',
     cookie_expiry_days=30
 )
 
 # ───────────────────────────────────────────────
 # LOGIN / SIGNUP PAGE
 # ───────────────────────────────────────────────
-name, authentication_status, username = authenticator.login('Login', 'main')
+name, authentication_status, username = authenticator.login('Login')  # ← No second arg – this fixes ValueError
 
 if authentication_status:
-    # Logged in – show translator
     st.success(f"Welcome {name}!")
 
-    # Track login (optional)
-    log = f"{datetime.now()} - Login: {username}"
-    # st.write(log)  # uncomment if you want to show log
-
-    # Logout button (1-click, instant)
+    # Logout button (1-click)
     authenticator.logout('Logout', 'main')
 
     # ───────────────────────────────────────────────
