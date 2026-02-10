@@ -12,7 +12,7 @@ from pptx import Presentation
 import json
 import base64
 import hashlib
-import time
+import uuid
 
 # ───────────────────────────────────────────────
 # APPROVED USERS (plain passwords – testing/private use only)
@@ -29,43 +29,15 @@ credentials = {
             'password': 'Junior76755782@',
             'email': 'phosis667@npaid.org'
         }
-        # Add new users here with plain passwords
     }
 }
 
-# GitHub API setup for device persistence (separate repo)
+# GitHub API setup
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 GITHUB_REPO = st.secrets["GITHUB_REPO"]
-GITHUB_FILE = 'logins.json'  # File in the separate repo
+GITHUB_FILE = 'logins.json'
 
-# Generate unique device ID (stronger fingerprint + random salt)
-def get_device_id():
-    # Base fingerprint from browser info
-    fingerprint = ""
-    try:
-        fingerprint += st.user_agent or ""
-        fingerprint += str(st.session_state.get('screen_width', 0))
-        fingerprint += str(st.session_state.get('screen_height', 0))
-        fingerprint += str(st.session_state.get('language', ''))
-        fingerprint += str(st.session_state.get('timezone', ''))
-        # Add JS info for more uniqueness
-        st.components.v1.html("""
-            <script>
-            window.parent.postMessage({
-                type: 'fingerprint',
-                value: navigator.userAgent + screen.width + screen.height + navigator.language + Intl.DateTimeFormat().resolvedOptions().timeZone + navigator.hardwareConcurrency + navigator.deviceMemory
-            }, "*");
-            </script>
-        """, height=0)
-    except:
-        fingerprint = "default"
-    # Add random salt (generated once)
-    if 'device_salt' not in st.session_state:
-        st.session_state['device_salt'] = str(time.time()) + str(hash(str(fingerprint)))
-    fingerprint += st.session_state['device_salt']
-    return hashlib.sha256(fingerprint.encode()).hexdigest()[:32]
-
-# Load logins from GitHub repo
+# Load logins from GitHub
 def load_logins():
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
@@ -73,25 +45,41 @@ def load_logins():
     if response.status_code == 200:
         content = response.json()['content']
         return json.loads(base64.b64decode(content))
-    else:
-        return {}
+    return {}
 
-# Save logins to GitHub repo
+# Save logins to GitHub
 def save_logins(logins):
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Content-Type": "application/json"}
     response = requests.get(url, headers=headers)
     sha = response.json()['sha'] if response.status_code == 200 else None
     content = base64.b64encode(json.dumps(logins).encode()).decode()
-    data = {
-        "message": "Update logins.json",
-        "content": content,
-        "sha": sha if sha else None
-    }
+    data = {"message": "Update logins.json", "content": content, "sha": sha}
     requests.put(url, headers=headers, json=data)
 
-# Check if current device is logged in
-device_id = get_device_id()
+# Get persistent device ID from localStorage (or create new one)
+def get_persistent_device_id():
+    # Try to get from localStorage via JS
+    st.components.v1.html("""
+        <script>
+        const deviceId = localStorage.getItem('johny_device_id');
+        if (!deviceId) {
+            const newId = crypto.randomUUID();
+            localStorage.setItem('johny_device_id', newId);
+            parent.postMessage({type: 'device_id', value: newId}, "*");
+        } else {
+            parent.postMessage({type: 'device_id', value: deviceId}, "*");
+        }
+        </script>
+    """, height=0)
+    # Fallback if JS not run yet
+    if 'device_id' not in st.session_state:
+        st.session_state['device_id'] = str(uuid.uuid4())
+    return st.session_state['device_id']
+
+device_id = get_persistent_device_id()
+
+# Check if this device is logged in
 logins = load_logins()
 if device_id in logins:
     logged_in_username = logins[device_id]
@@ -120,14 +108,14 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
-                    # Save device ID in separate repo for persistence
+                    # Save device ID in repo
                     logins = load_logins()
                     logins[device_id] = username
                     save_logins(logins)
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username} (Device ID: {device_id})"
                     st.write(log)
-                    st.rerun()  # Instant 1-click reload to show translator
+                    st.rerun()
                 else:
                     st.error("Incorrect password")
             else:
