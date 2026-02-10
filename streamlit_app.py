@@ -13,51 +13,50 @@ from openpyxl import load_workbook
 from pptx import Presentation
 
 # ───────────────────────────────────────────────
-# APPROVED USERS (correct format)
+# APPROVED USERS
 # ───────────────────────────────────────────────
 credentials = {
     'usernames': {
-        # Starter admin user - change password hash after testing
         'admin': {
             'name': 'Admin',
             'password': '$2b$12$examplehashedpasswordhere',  # Replace with real bcrypt hash
             'email': 'sisouvanhjunior@gmail.com'
         },
-        # Add approved users here:
-        # 'newuser': {
-        #     'name': 'Full Name',
-        #     'password': '$2b$12$hashed',
-        #     'email': 'user@email.com'
-        # }
+        # Add approved users here after email requests
     }
 }
 
-# Authenticator setup (no location arg here - we place form manually)
+# Authenticator setup
 authenticator = stauth.Authenticate(
     credentials=credentials,
     cookie_name='johny_cookie',
-    key='random_johny_key_change_me_2026',
-    cookie_expiry_days=30  # Remember me for 30 days
+    key='random_johny_key_2026',
+    cookie_expiry_days=30
 )
 
 # ───────────────────────────────────────────────
-# PLACE LOGIN FORM IN SIDEBAR (this avoids the ValueError)
+# MANUAL SIDEBAR LOGIN FORM (avoids ValueError)
 # ───────────────────────────────────────────────
 with st.sidebar:
     st.title("Johny Login")
-    name, authentication_status, username = authenticator.login('Login', 'main')  # 'main' here is safe inside sidebar
-
-    if authentication_status:
-        st.success(f"Welcome {name}!")
-        log = f"{datetime.now()} - Login: {username}"
-        st.write(log)
+    if st.session_state.get("authentication_status"):
+        st.success(f"Welcome {st.session_state['name']}!")
         authenticator.logout('Logout', 'sidebar')
-    elif authentication_status == False:
-        st.error('Username/password incorrect')
-    elif authentication_status == None:
-        st.warning('Enter username and password')
+    else:
+        # Login form in sidebar
+        authenticator.login('Login', 'main')  # No location arg here - form is already in sidebar
 
-# Sign Up form (below sidebar login)
+        if st.session_state.get("authentication_status"):
+            log = f"{datetime.now()} - Login: {st.session_state['username']}"
+            st.write(log)
+        elif st.session_state.get("authentication_status") == False:
+            st.error('Username/password incorrect')
+        elif st.session_state.get("authentication_status") == None:
+            st.warning('Enter username and password above')
+
+# ───────────────────────────────────────────────
+# SIGN UP (only show if not logged in)
+# ───────────────────────────────────────────────
 if not st.session_state.get("authentication_status"):
     st.subheader("Sign Up (Request Approval)")
     st.info("Sign up — request sent to sisouvanhjunior@gmail.com for approval.")
@@ -76,7 +75,7 @@ if not st.session_state.get("authentication_status"):
             msg['Subject'] = "New Johny Signup Request"
             msg['From'] = st.secrets["EMAIL_USER"]
             msg['To'] = "sisouvanhjunior@gmail.com"
-            msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword: {new_password}\nApprove by adding to credentials.")
+            msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword: {new_password}\nApprove by adding to code.")
 
             try:
                 with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
@@ -87,7 +86,7 @@ if not st.session_state.get("authentication_status"):
                 st.error(f"Email failed: {str(e)}")
 
 # ───────────────────────────────────────────────
-# TRANSLATOR (only shown after login)
+# TRANSLATOR (only after login)
 # ───────────────────────────────────────────────
 if st.session_state.get("authentication_status"):
     # GEMINI CONFIG
@@ -145,7 +144,7 @@ Text: {text}"""
             if "429" in str(e.last_attempt.exception()) or "quota" in str(e.last_attempt.exception()).lower():
                 if st.session_state.current_model == PRIMARY_MODEL:
                     st.session_state.current_model = FALLBACK_MODEL
-                    st.info("Rate limit — switched to fallback model.")
+                    st.info("Rate limit — switched to fallback.")
                     global model
                     model = genai.GenerativeModel(FALLBACK_MODEL)
                     response = model.generate_content(prompt)
@@ -274,9 +273,11 @@ Text: {text}"""
                         key="download_" + str(time.time())
                     )
 
-    with st.expander("➕ Teach Johny a new term (edit glossary.txt in GitHub)"):
-        st.info("Edit glossary.txt in repo → add 'english:lao' → save → app updates.")
-        st.code("Example:\nUXO:ລບຕ\nhello:ສະບາຍດີ")
+                    st.caption("Tip: Refresh or use Chrome if needed.")
+
+    with st.expander("➕ Teach Johny a new term"):
+        st.info("Edit glossary.txt in repo → add 'english:lao' → save.")
+        st.code("Example:\nUXO:ລບຕ")
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
