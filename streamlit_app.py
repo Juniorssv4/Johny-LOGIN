@@ -6,26 +6,28 @@ from email.message import EmailMessage
 from datetime import datetime
 
 # ───────────────────────────────────────────────
-# APPROVED USERS (add here after approval)
+# APPROVED USERS (correct format for streamlit-authenticator)
 # ───────────────────────────────────────────────
-users = {
-    # Example starter user - replace or delete
-    'admin': {
-        'name': 'Admin',
-        'password': '$2b$12$examplehashedpasswordhere',  # Replace with real hash
-        'email': 'sisouvanhjunior@gmail.com'
-    },
-    # Add approved users here after you get email requests:
-    # 'newuser': {
-    #     'name': 'Full Name',
-    #     'password': '$2b$12$hashed_password_from_tool',
-    #     'email': 'user@email.com'
-    # }
+credentials = {
+    'usernames': {
+        # Example starter user - replace or delete after testing
+        'admin': {
+            'name': 'Admin',
+            'password': '$2b$12$examplehashedpasswordhere',  # Replace with real bcrypt hash
+            'email': 'sisouvanhjunior@gmail.com'
+        },
+        # Add approved users here after you get email requests:
+        # 'newuser': {
+        #     'name': 'Full Name',
+        #     'password': '$2b$12$hashed_password_from_tool',
+        #     'email': 'user@email.com'
+        # }
+    }
 }
 
 # Authenticator setup
 authenticator = stauth.Authenticate(
-    credentials=users,
+    credentials=credentials,
     cookie_name='johny_cookie',
     key='random_johny_key_change_me_2026',
     cookie_expiry_days=30  # Remember me for 30 days
@@ -41,7 +43,7 @@ if not st.session_state.get("authentication_status"):
         name, authentication_status, username = authenticator.login('Login', 'main')
         if authentication_status:
             st.success(f"Welcome {name}!")
-            # Track login (shown for now - can email later)
+            # Track login (shown for now)
             log = f"{datetime.now()} - Login: {username}"
             st.write(log)
             authenticator.logout('Logout', 'sidebar')
@@ -60,7 +62,7 @@ if not st.session_state.get("authentication_status"):
         if st.button("Sign Up"):
             if new_password != confirm_password:
                 st.error("Passwords do not match")
-            elif new_username in users:
+            elif new_username in credentials['usernames']:
                 st.error("Username already taken")
             else:
                 # Send approval request to you
@@ -68,7 +70,7 @@ if not st.session_state.get("authentication_status"):
                 msg['Subject'] = "New Johny Signup Request"
                 msg['From'] = st.secrets["EMAIL_USER"]
                 msg['To'] = "sisouvanhjunior@gmail.com"
-                msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword (plain): {new_password}\n\nApprove by adding to 'users' dict with hashed password.")
+                msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword (plain): {new_password}\n\nApprove by adding to 'credentials['usernames']' dict with hashed password.")
 
                 try:
                     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
@@ -80,7 +82,7 @@ if not st.session_state.get("authentication_status"):
 
 else:
     # ───────────────────────────────────────────────
-    # YOUR JOHNY TRANSLATOR (after login)
+    # YOUR JOHNY TRANSLATOR CODE (after login)
     # ───────────────────────────────────────────────
 
     import google.generativeai as genai
