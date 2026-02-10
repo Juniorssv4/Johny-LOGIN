@@ -11,13 +11,13 @@ from openpyxl import load_workbook
 from pptx import Presentation
 
 # ───────────────────────────────────────────────
-# APPROVED USERS (plain passwords - for testing only)
+# APPROVED USERS (plain passwords – for testing/private use only)
 # ───────────────────────────────────────────────
 credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # plain password - change it
+            'password': 'admin123',  # change this to a real password
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
@@ -54,9 +54,10 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
-                    st.success(f"Welcome {user['name']}!")
+                    st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
+                    st.rerun()  # ← Instant 1-click reload to show translator
                 else:
                     st.error("Incorrect password")
             else:
@@ -280,7 +281,6 @@ Text: {text}"""
 
     st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
 
-    # Logout button
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
         st.rerun()
