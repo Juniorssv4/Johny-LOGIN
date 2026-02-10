@@ -62,7 +62,7 @@ if not st.session_state.get("authentication_status"):
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
-                    st.rerun()  # 1-click success
+                    st.rerun()  # Instant 1-click reload to show translator
                 else:
                     st.error("Incorrect password")
             else:
@@ -291,3 +291,5 @@ Text: {text}"""
         st.session_state["authentication_status"] = False
         st.query_params.clear()  # Remove all params (logged_in gone)
         st.rerun()
+else:
+    st.warning("Please log in to access the translator.")
