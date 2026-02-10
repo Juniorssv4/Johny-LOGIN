@@ -1,10 +1,10 @@
 usernames:
   admin:
     name: Admin
-    password: Junior76755782@
+    password: admin123   # plain password for admin (change it)
     email: sisouvanhjunior@gmail.com
 
   juniorssv4:
     name: Junior SSV4
-    password: Junior76755782@
+    password: Junior76755782@   # plain password from signup email
     email: phosis667@npaid.org
