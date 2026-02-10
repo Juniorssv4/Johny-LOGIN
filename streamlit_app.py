@@ -11,7 +11,6 @@ from openpyxl import load_workbook
 from pptx import Presentation
 import json
 import base64
-import hashlib
 import uuid
 
 # ───────────────────────────────────────────────
@@ -29,6 +28,7 @@ credentials = {
             'password': 'Junior76755782@',
             'email': 'phosis667@npaid.org'
         }
+        # Add new users here with plain passwords
     }
 }
 
@@ -57,27 +57,26 @@ def save_logins(logins):
     data = {"message": "Update logins.json", "content": content, "sha": sha}
     requests.put(url, headers=headers, json=data)
 
-# Get persistent device ID from localStorage (or create new one)
-def get_persistent_device_id():
-    # Try to get from localStorage via JS
+# Get persistent device ID from localStorage (create if not exists)
+def get_device_id():
+    # Use JS to read/create persistent ID in localStorage
     st.components.v1.html("""
         <script>
-        const deviceId = localStorage.getItem('johny_device_id');
+        let deviceId = localStorage.getItem('johny_device_id');
         if (!deviceId) {
-            const newId = crypto.randomUUID();
-            localStorage.setItem('johny_device_id', newId);
-            parent.postMessage({type: 'device_id', value: newId}, "*");
-        } else {
-            parent.postMessage({type: 'device_id', value: deviceId}, "*");
+            deviceId = crypto.randomUUID();
+            localStorage.setItem('johny_device_id', deviceId);
         }
+        parent.postMessage({type: 'device_id', value: deviceId}, "*");
         </script>
     """, height=0)
-    # Fallback if JS not run yet
+
+    # Fallback in Python if JS not yet run
     if 'device_id' not in st.session_state:
         st.session_state['device_id'] = str(uuid.uuid4())
     return st.session_state['device_id']
 
-device_id = get_persistent_device_id()
+device_id = get_device_id()
 
 # Check if this device is logged in
 logins = load_logins()
