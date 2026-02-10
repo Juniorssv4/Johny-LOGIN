@@ -1,10 +1,10 @@
 usernames:
   admin:
     name: Admin
-    password: $2b$12$examplehashedpasswordhere   # ← keep or replace if you have admin hash
+    password: Junior76755782@
     email: sisouvanhjunior@gmail.com
 
   juniorssv4:
     name: Junior SSV4
-    password: $2a$12$c/6DcCyTVrOrTrBE4zfCGeNsVQpDpOfGzlf/E9clSggMA8OWH6AFq
+    password: Junior76755782@
     email: phosis667@npaid.org
