@@ -1,0 +1,9 @@
+streamlit
+openai
+python-docx
+openpyxl
+python-pptx
+pdf2docx
+google-generativeai 
+google-genai        
+tenacity
