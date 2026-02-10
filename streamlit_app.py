@@ -9,7 +9,6 @@ from io import BytesIO
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
-import hashlib
 
 # ───────────────────────────────────────────────
 # APPROVED USERS (plain passwords – testing/private use only)
@@ -30,29 +29,6 @@ credentials = {
     }
 }
 
-# Generate unique device fingerprint (browser + screen + timezone + language)
-def get_device_fingerprint():
-    # Simple fingerprint using available browser info
-    fingerprint = ""
-    try:
-        fingerprint += st.user_agent or ""
-        fingerprint += str(st.session_state.get('screen_width', 0))
-        fingerprint += str(st.session_state.get('screen_height', 0))
-        fingerprint += str(st.session_state.get('language', ''))
-        fingerprint += str(st.session_state.get('timezone', ''))
-    except:
-        fingerprint = "default"
-    # Hash it to make it short and unique
-    return hashlib.sha256(fingerprint.encode()).hexdigest()[:32]
-
-# Load saved logged-in username from localStorage for this device
-device_id = get_device_fingerprint()
-saved_username = st.session_state.get(f"johny_logged_in_{device_id}", None)
-if saved_username and saved_username in credentials['usernames']:
-    st.session_state["authentication_status"] = True
-    st.session_state["name"] = credentials['usernames'][saved_username]['name']
-    st.session_state["username"] = saved_username
-
 # ───────────────────────────────────────────────
 # LOGIN / SIGN UP PAGE
 # ───────────────────────────────────────────────
@@ -65,7 +41,7 @@ if not st.session_state.get("authentication_status"):
         st.subheader("Login")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
-        remember_me = st.checkbox("Remember me on this device", value=True)
+        remember_me = st.checkbox("Remember me on this device (30 days)", value=True)
 
         if st.button("Login"):
             if username in credentials['usernames']:
@@ -75,10 +51,15 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
                     if remember_me:
-                        # Save to localStorage for this device only
-                        st.session_state[f"johny_logged_in_{device_id}"] = username
+                        # Save to localStorage (survives refresh/close/reopen on this device)
+                        st.components.v1.html(f"""
+                            <script>
+                            localStorage.setItem('johny_logged_in_username', '{username}');
+                            localStorage.setItem('johny_logged_in_time', '{datetime.now().timestamp()}');
+                            </script>
+                        """, height=0)
                     st.success(f"Welcome {user['name']}! Loading translator...")
-                    log = f"{datetime.now()} - Login: {username} (Device ID: {device_id})"
+                    log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
                     st.rerun()  # Instant 1-click reload to show translator
                 else:
