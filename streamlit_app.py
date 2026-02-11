@@ -9,17 +9,15 @@ from io import BytesIO
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
-import uuid
 
 # ───────────────────────────────────────────────
 # APPROVED USERS (plain passwords – testing/private use only)
 # ───────────────────────────────────────────────
-# This must be at the top so it's defined before login check
 credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this
+            'password': 'admin123',  # change this to a real password
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
@@ -32,33 +30,41 @@ credentials = {
 }
 
 # ───────────────────────────────────────────────
-# PERSISTENT LOGIN USING LOCALSTORAGE + ONE-TIME UUID
+# REMEMBER ME: AUTO-FILL & AUTO-LOGIN FROM LOCALSTORAGE
 # ───────────────────────────────────────────────
-def get_persistent_device_id():
-    # JS to create/read permanent UUID in localStorage
-    st.components.v1.html("""
-        <script>
-        let deviceId = localStorage.getItem('johny_device_id');
-        if (!deviceId) {
-            deviceId = crypto.randomUUID();
-            localStorage.setItem('johny_device_id', deviceId);
-        }
-        parent.postMessage({type: 'device_id', value: deviceId}, "*");
-        </script>
-    """, height=0)
+# Run JS to load saved credentials from localStorage
+st.components.v1.html("""
+    <script>
+    const savedUsername = localStorage.getItem('johny_remember_username');
+    const savedPassword = localStorage.getItem('johny_remember_password');
+    if (savedUsername && savedPassword) {
+        parent.postMessage({
+            type: 'remember_me_credentials',
+            username: savedUsername,
+            password: savedPassword
+        }, "*");
+    }
+    </script>
+""", height=0)
 
-    if 'device_id' not in st.session_state:
-        st.session_state['device_id'] = str(uuid.uuid4())
-    return st.session_state['device_id']
+# Receive saved credentials from JS
+if 'remember_username' not in st.session_state:
+    st.session_state['remember_username'] = None
+    st.session_state['remember_password'] = None
 
-device_id = get_persistent_device_id()
-
-# Load saved username from localStorage
-saved_username = st.session_state.get(f"johny_logged_in_{device_id}", None)
-if saved_username and saved_username in credentials['usernames']:
-    st.session_state["authentication_status"] = True
-    st.session_state["name"] = credentials['usernames'][saved_username]['name']
-    st.session_state["username"] = saved_username
+# Auto-login if saved credentials are valid
+if st.session_state['remember_username'] and st.session_state['remember_password']:
+    username = st.session_state['remember_username']
+    password = st.session_state['remember_password']
+    if username in credentials['usernames']:
+        user = credentials['usernames'][username]
+        if password == user['password']:
+            st.session_state["authentication_status"] = True
+            st.session_state["name"] = user['name']
+            st.session_state["username"] = username
+            # Auto-submit login (silent)
+            st.success(f"Welcome back {user['name']}! Logging you in...")
+            st.rerun()
 
 # ───────────────────────────────────────────────
 # LOGIN / SIGN UP PAGE
@@ -70,9 +76,9 @@ if not st.session_state.get("authentication_status"):
 
     with tab_login:
         st.subheader("Login")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        remember_me = st.checkbox("Keep me signed in (30 days)", value=True)
+        username = st.text_input("Username", value=st.session_state.get('remember_username', ''))
+        password = st.text_input("Password", type="password", value=st.session_state.get('remember_password', ''))
+        remember_me = st.checkbox("Remember me on this device (auto-login next time)", value=True)
 
         if st.button("Login"):
             if username in credentials['usernames']:
@@ -82,8 +88,13 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
                     if remember_me:
-                        # Save username to localStorage for this device
-                        st.session_state[f"johny_logged_in_{device_id}"] = username
+                        # Save to localStorage (plain text – for your private use only)
+                        st.components.v1.html(f"""
+                            <script>
+                            localStorage.setItem('johny_remember_username', '{username}');
+                            localStorage.setItem('johny_remember_password', '{password}');
+                            </script>
+                        """, height=0)
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
@@ -314,10 +325,10 @@ Text: {text}"""
     # Logout button (1-click, instant return to login)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
-        # Clear localStorage
         st.components.v1.html("""
             <script>
-            localStorage.removeItem('johny_logged_in_username');
+            localStorage.removeItem('johny_remember_username');
+            localStorage.removeItem('johny_remember_password');
             </script>
         """, height=0)
         st.rerun()
