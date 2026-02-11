@@ -13,25 +13,6 @@ import json
 import uuid
 
 # ───────────────────────────────────────────────
-# LOAD FIREBASE CONFIG FROM GITHUB (Option 1)
-# ───────────────────────────────────────────────
-FIREBASE_RAW_URL = "https://raw.githubusercontent.com/Juniorssv4/YOUR_MAIN_REPO_NAME/main/firebase_config.json"
-# CHANGE "YOUR_MAIN_REPO_NAME" to your actual repo name (e.g. Johny-LOGIN or streamlit-app or whatever it is)
-
-try:
-    config_response = requests.get(FIREBASE_RAW_URL)
-    if config_response.status_code == 200:
-        FIREBASE_CONFIG = config_response.json()
-    else:
-        FIREBASE_CONFIG = None
-except:
-    FIREBASE_CONFIG = None
-
-# If Firebase config failed to load, show warning (but app still works in locked mode)
-if FIREBASE_CONFIG is None:
-    st.warning("Firebase config not loaded from GitHub. Persistence disabled.")
-
-# ───────────────────────────────────────────────
 # APPROVED USERS (plain passwords – testing/private use only)
 # ───────────────────────────────────────────────
 credentials = {
@@ -49,19 +30,30 @@ credentials = {
     }
 }
 
-# Persistent device ID (UUID once per device, stored in localStorage)
-def get_device_id():
-    st.components.v1.html("""
-        <script>
-        let deviceId = localStorage.getItem('johny_device_id');
-        if (!deviceId) {
-            deviceId = crypto.randomUUID();
-            localStorage.setItem('johny_device_id', deviceId);
-        }
-        parent.postMessage({type: 'device_id', value: deviceId}, "*");
-        </script>
-    """, height=0)
+# Load Firebase config from GitHub raw file
+FIREBASE_RAW_URL = "https://raw.githubusercontent.com/Juniorssv4/YOUR_REPO_NAME/main/firebase_config.json"
+# CHANGE YOUR_REPO_NAME to your actual repo name (e.g. Johny-LOGIN)
 
+try:
+    config_response = requests.get(FIREBASE_RAW_URL)
+    if config_response.status_code == 200:
+        FIREBASE_CONFIG = config_response.json()
+    else:
+        FIREBASE_CONFIG = None
+except:
+    FIREBASE_CONFIG = None
+
+if FIREBASE_CONFIG is None:
+    st.warning("Firebase config not loaded. Using locked mode (no persistence).")
+
+# Firebase database URL
+if FIREBASE_CONFIG:
+    FIREBASE_URL = f"{FIREBASE_CONFIG['databaseURL']}/logins.json"
+else:
+    FIREBASE_URL = None
+
+# Persistent device ID
+def get_device_id():
     if 'device_id' not in st.session_state:
         st.session_state['device_id'] = str(uuid.uuid4())
     return st.session_state['device_id']
@@ -70,14 +62,14 @@ device_id = get_device_id()
 
 # Load logins from Firebase (if config loaded)
 logins = {}
-if FIREBASE_CONFIG:
-    FIREBASE_URL = f"{FIREBASE_CONFIG['databaseURL']}/logins.json"
+if FIREBASE_URL:
     try:
         r = requests.get(FIREBASE_URL)
         logins = r.json() if r.status_code == 200 else {}
     except:
         logins = {}
 
+# Auto-login if device is saved
 if device_id in logins:
     username = logins[device_id]
     if username in credentials['usernames']:
@@ -106,7 +98,7 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
                     # Save to Firebase
-                    if FIREBASE_CONFIG:
+                    if FIREBASE_URL:
                         logins = load_logins()
                         logins[device_id] = username
                         requests.put(FIREBASE_URL, json=logins)
@@ -146,8 +138,8 @@ if not st.session_state.get("authentication_status"):
                     st.error(f"Email failed: {str(e)}")
 
 else:
-    # Translator code (same as before - paste your translator section here)
-    # ... (your translator code) ...
+    # Translator code (your existing translator section goes here)
+    # ... paste your translator code here ...
 
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
