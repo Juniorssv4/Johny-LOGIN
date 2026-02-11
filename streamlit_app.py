@@ -9,9 +9,6 @@ from io import BytesIO
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
-import json
-import base64
-import uuid
 
 # ───────────────────────────────────────────────
 # APPROVED USERS (plain passwords – testing/private use only)
@@ -32,34 +29,11 @@ credentials = {
     }
 }
 
-# GitHub API setup (your database repo)
-GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
-GITHUB_REPO = st.secrets["GITHUB_REPO"]
-GITHUB_FILE = 'logins.json'
-
-# Load logins from GitHub
-def load_logins():
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        content = response.json()['content']
-        return json.loads(base64.b64decode(content))
-    return {}
-
-# Save logins to GitHub
-def save_logins(logins):
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Content-Type": "application/json"}
-    response = requests.get(url, headers=headers)
-    sha = response.json()['sha'] if response.status_code == 200 else None
-    content = base64.b64encode(json.dumps(logins).encode()).decode()
-    data = {"message": "Update logins.json", "content": content, "sha": sha}
-    requests.put(url, headers=headers, json=data)
-
-# Get persistent device ID from localStorage (created once)
-def get_device_id():
-    # Use JS to read/create persistent ID
+# ───────────────────────────────────────────────
+# PERSISTENT DEVICE ID (UUID once per browser/device)
+# ───────────────────────────────────────────────
+def get_persistent_device_id():
+    # Use JS to read/create persistent UUID in localStorage
     st.components.v1.html("""
         <script>
         let deviceId = localStorage.getItem('johny_device_id');
@@ -76,16 +50,7 @@ def get_device_id():
         st.session_state['device_id'] = str(uuid.uuid4())
     return st.session_state['device_id']
 
-device_id = get_device_id()
-
-# Check if this device is logged in
-logins = load_logins()
-if device_id in logins:
-    logged_in_username = logins[device_id]
-    if logged_in_username in credentials['usernames']:
-        st.session_state["authentication_status"] = True
-        st.session_state["name"] = credentials['usernames'][logged_in_username]['name']
-        st.session_state["username"] = logged_in_username
+device_id = get_persistent_device_id()
 
 # ───────────────────────────────────────────────
 # LOGIN / SIGN UP PAGE
@@ -107,14 +72,16 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
-                    # Save device ID in GitHub repo
-                    logins = load_logins()
-                    logins[device_id] = username
-                    save_logins(logins)
+                    # Save username to localStorage for this device
+                    st.components.v1.html(f"""
+                        <script>
+                        localStorage.setItem('johny_logged_in_username', '{username}');
+                        </script>
+                    """, height=0)
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username} (Device ID: {device_id})"
                     st.write(log)
-                    st.rerun()
+                    st.rerun()  # Instant 1-click reload to show translator
                 else:
                     st.error("Incorrect password")
             else:
