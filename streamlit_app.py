@@ -1,7 +1,7 @@
 import streamlit as st
 import smtplib
 from email.message import EmailMessage
-from datetime import datetime
+from datetime import datetime, timedelta
 import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 import requests
@@ -9,69 +9,42 @@ from io import BytesIO
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
+import base64
+
+# Secret salt (change this to your own random string)
+SECRET_SALT = "my-super-secret-salt-2025-change-me"
+
+def create_token(username):
+    # Simple token: username + timestamp + salt
+    timestamp = str(int(datetime.now().timestamp()))
+    raw = f"{username}|{timestamp}|{SECRET_SALT}"
+    # Base64 encode (not real encryption, but enough for this)
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+def validate_token(token):
+    try:
+        raw = base64.urlsafe_b64decode(token.encode()).decode()
+        username, ts_str, salt = raw.split('|')
+        if salt != SECRET_SALT:
+            return None
+        ts = int(ts_str)
+        # Valid for 30 days
+        if datetime.now().timestamp() - ts > 30 * 24 * 3600:
+            return None
+        return username
+    except:
+        return None
 
 # ───────────────────────────────────────────────
-# APPROVED USERS (plain passwords – testing/private use only)
+# AUTO-LOGIN FROM LOCALSTORAGE
 # ───────────────────────────────────────────────
-credentials = {
-    'usernames': {
-        'admin': {
-            'name': 'Admin',
-            'password': 'admin123',  # change this
-            'email': 'sisouvanhjunior@gmail.com'
-        },
-        'juniorssv4': {
-            'name': 'Junior SSV4',
-            'password': 'Junior76755782@',
-            'email': 'phosis667@npaid.org'
-        }
-        # Add new users here with plain passwords
-    }
-}
-
-# ───────────────────────────────────────────────
-# REMEMBER ME USING LOCALSTORAGE (auto-fill & auto-login)
-# ───────────────────────────────────────────────
-# Run JS to load saved credentials from localStorage
-st.components.v1.html("""
-    <script>
-    const savedUsername = localStorage.getItem('johny_remember_username');
-    const savedPassword = localStorage.getItem('johny_remember_password');
-    if (savedUsername && savedPassword) {
-        parent.postMessage({
-            type: 'remember_me_credentials',
-            username: savedUsername,
-            password: savedPassword
-        }, "*");
-    }
-    </script>
-""", height=0)
-
-# Receive saved credentials from JS
-if 'remember_username' not in st.session_state:
-    st.session_state['remember_username'] = None
-    st.session_state['remember_password'] = None
-
-# Auto-fill form if credentials are saved
-if st.session_state['remember_username'] and st.session_state['remember_password']:
-    st.session_state['username_input'] = st.session_state['remember_username']
-    st.session_state['password_input'] = st.session_state['remember_password']
-    # Auto-submit login
-    if st.button("Login", key="auto_login"):
-        username = st.session_state['remember_username']
-        password = st.session_state['remember_password']
-        if username in credentials['usernames']:
-            user = credentials['usernames'][username]
-            if password == user['password']:
-                st.session_state["authentication_status"] = True
-                st.session_state["name"] = user['name']
-                st.session_state["username"] = username
-                st.success(f"Welcome back {user['name']}! Loading translator...")
-                st.rerun()
-            else:
-                st.error("Saved password incorrect — please login manually")
-        else:
-            st.error("Saved username no longer valid — please login manually")
+saved_token = st.session_state.get('persistent_token', None)
+if saved_token:
+    username = validate_token(saved_token)
+    if username and username in credentials['usernames']:
+        st.session_state["authentication_status"] = True
+        st.session_state["name"] = credentials['usernames'][username]['name']
+        st.session_state["username"] = username
 
 # ───────────────────────────────────────────────
 # LOGIN / SIGN UP PAGE
@@ -83,9 +56,9 @@ if not st.session_state.get("authentication_status"):
 
     with tab_login:
         st.subheader("Login")
-        username = st.text_input("Username", value=st.session_state.get('username_input', ''))
-        password = st.text_input("Password", type="password", value=st.session_state.get('password_input', ''))
-        remember_me = st.checkbox("Remember me on this device", value=True)
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        remember_me = st.checkbox("Keep me signed in (30 days)", value=True)
 
         if st.button("Login"):
             if username in credentials['usernames']:
@@ -95,13 +68,8 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
                     if remember_me:
-                        # Save to localStorage
-                        st.components.v1.html(f"""
-                            <script>
-                            localStorage.setItem('johny_remember_username', '{username}');
-                            localStorage.setItem('johny_remember_password', '{password}');
-                            </script>
-                        """, height=0)
+                        token = create_token(username)
+                        st.session_state['persistent_token'] = token
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
@@ -332,9 +300,4 @@ Text: {text}"""
     # Logout button (1-click, instant return to login)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
-        st.components.v1.html("""
-            <script>
-            localStorage.removeItem('johny_logged_in_username');
-            </script>
-        """, height=0)
         st.rerun()
