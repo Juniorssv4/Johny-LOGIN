@@ -1,7 +1,7 @@
 import streamlit as st
 import smtplib
 from email.message import EmailMessage
-from datetime import datetime, timedelta
+from datetime import datetime
 import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 import requests
@@ -9,42 +9,56 @@ from io import BytesIO
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
-import base64
-
-# Secret salt (change this to your own random string)
-SECRET_SALT = "my-super-secret-salt-2025-change-me"
-
-def create_token(username):
-    # Simple token: username + timestamp + salt
-    timestamp = str(int(datetime.now().timestamp()))
-    raw = f"{username}|{timestamp}|{SECRET_SALT}"
-    # Base64 encode (not real encryption, but enough for this)
-    return base64.urlsafe_b64encode(raw.encode()).decode()
-
-def validate_token(token):
-    try:
-        raw = base64.urlsafe_b64decode(token.encode()).decode()
-        username, ts_str, salt = raw.split('|')
-        if salt != SECRET_SALT:
-            return None
-        ts = int(ts_str)
-        # Valid for 30 days
-        if datetime.now().timestamp() - ts > 30 * 24 * 3600:
-            return None
-        return username
-    except:
-        return None
+import uuid
 
 # ───────────────────────────────────────────────
-# AUTO-LOGIN FROM LOCALSTORAGE
+# APPROVED USERS (plain passwords – testing/private use only)
 # ───────────────────────────────────────────────
-saved_token = st.session_state.get('persistent_token', None)
-if saved_token:
-    username = validate_token(saved_token)
-    if username and username in credentials['usernames']:
-        st.session_state["authentication_status"] = True
-        st.session_state["name"] = credentials['usernames'][username]['name']
-        st.session_state["username"] = username
+# This must be at the top so it's defined before login check
+credentials = {
+    'usernames': {
+        'admin': {
+            'name': 'Admin',
+            'password': 'admin123',  # change this
+            'email': 'sisouvanhjunior@gmail.com'
+        },
+        'juniorssv4': {
+            'name': 'Junior SSV4',
+            'password': 'Junior76755782@',
+            'email': 'phosis667@npaid.org'
+        }
+        # Add new users here with plain passwords
+    }
+}
+
+# ───────────────────────────────────────────────
+# PERSISTENT LOGIN USING LOCALSTORAGE + ONE-TIME UUID
+# ───────────────────────────────────────────────
+def get_persistent_device_id():
+    # JS to create/read permanent UUID in localStorage
+    st.components.v1.html("""
+        <script>
+        let deviceId = localStorage.getItem('johny_device_id');
+        if (!deviceId) {
+            deviceId = crypto.randomUUID();
+            localStorage.setItem('johny_device_id', deviceId);
+        }
+        parent.postMessage({type: 'device_id', value: deviceId}, "*");
+        </script>
+    """, height=0)
+
+    if 'device_id' not in st.session_state:
+        st.session_state['device_id'] = str(uuid.uuid4())
+    return st.session_state['device_id']
+
+device_id = get_persistent_device_id()
+
+# Load saved username from localStorage
+saved_username = st.session_state.get(f"johny_logged_in_{device_id}", None)
+if saved_username and saved_username in credentials['usernames']:
+    st.session_state["authentication_status"] = True
+    st.session_state["name"] = credentials['usernames'][saved_username]['name']
+    st.session_state["username"] = saved_username
 
 # ───────────────────────────────────────────────
 # LOGIN / SIGN UP PAGE
@@ -68,8 +82,8 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
                     if remember_me:
-                        token = create_token(username)
-                        st.session_state['persistent_token'] = token
+                        # Save username to localStorage for this device
+                        st.session_state[f"johny_logged_in_{device_id}"] = username
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
@@ -300,4 +314,10 @@ Text: {text}"""
     # Logout button (1-click, instant return to login)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
+        # Clear localStorage
+        st.components.v1.html("""
+            <script>
+            localStorage.removeItem('johny_logged_in_username');
+            </script>
+        """, height=0)
         st.rerun()
