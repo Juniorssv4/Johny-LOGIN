@@ -1,9 +1,9 @@
 {
-  apiKey: "AIzaSyD8Ud6sNdCFjtsaf4HC-l7wLllN9wMXhN0",
-  authDomain: "johny-login-persistence.firebaseapp.com",
-  databaseURL: "https://johny-login-persistence-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "johny-login-persistence",
-  storageBucket: "johny-login-persistence.firebasestorage.app",
-  messagingSenderId: "874494498162",
-  appId: "1:874494498162:web:4e682d12d561759c4ff9eb"
-  }
+  "apiKey": "AIzaSyD8Ud6sNdCFjtsaf4HC-l7wLllN9wMXhN0",
+  "authDomain": "johny-login-persistence.firebaseapp.com",
+  "databaseURL": "https://johny-login-persistence-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "projectId": "johny-login-persistence",
+  "storageBucket": "johny-login-persistence.appspot.com",
+  "messagingSenderId": "874494498162",
+  "appId": "1:874494498162:web:4e682d12d561759c4ff9eb"
+}
