@@ -9,7 +9,6 @@ from io import BytesIO
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
-import uuid
 
 # ───────────────────────────────────────────────
 # APPROVED USERS (plain passwords – testing/private use only)
@@ -29,36 +28,6 @@ credentials = {
         # Add new users here with plain passwords
     }
 }
-
-# ───────────────────────────────────────────────
-# PERSISTENT DEVICE ID (UUID once per browser/device, stored in localStorage)
-# ───────────────────────────────────────────────
-def get_persistent_device_id():
-    # Use JS to read/create persistent UUID in localStorage
-    st.components.v1.html("""
-        <script>
-        let deviceId = localStorage.getItem('johny_device_id');
-        if (!deviceId) {
-            deviceId = crypto.randomUUID();
-            localStorage.setItem('johny_device_id', deviceId);
-        }
-        parent.postMessage({type: 'device_id', value: deviceId}, "*");
-        </script>
-    """, height=0)
-
-    # Fallback in Python if JS not run yet
-    if 'device_id' not in st.session_state:
-        st.session_state['device_id'] = str(uuid.uuid4())
-    return st.session_state['device_id']
-
-device_id = get_persistent_device_id()
-
-# Load saved logged-in username from localStorage for this device
-saved_username = st.session_state.get(f"johny_logged_in_{device_id}", None)
-if saved_username and saved_username in credentials['usernames']:
-    st.session_state["authentication_status"] = True
-    st.session_state["name"] = credentials['usernames'][saved_username]['name']
-    st.session_state["username"] = saved_username
 
 # ───────────────────────────────────────────────
 # LOGIN / SIGN UP PAGE
@@ -82,10 +51,14 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
                     if remember_me:
-                        # Save to localStorage for this device only
-                        st.session_state[f"johny_logged_in_{device_id}"] = username
+                        # Save to localStorage (survives refresh/close/reopen)
+                        st.components.v1.html(f"""
+                            <script>
+                            localStorage.setItem('johny_logged_in_username', '{username}');
+                            </script>
+                        """, height=0)
                     st.success(f"Welcome {user['name']}! Loading translator...")
-                    log = f"{datetime.now()} - Login: {username} (Device ID: {device_id})"
+                    log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
                     st.rerun()  # Instant 1-click reload to show translator
                 else:
@@ -314,4 +287,9 @@ Text: {text}"""
     # Logout button (1-click, instant return to login)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
+        st.components.v1.html("""
+            <script>
+            localStorage.removeItem('johny_logged_in_username');
+            </script>
+        """, height=0)
         st.rerun()
