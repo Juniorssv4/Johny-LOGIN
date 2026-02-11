@@ -20,7 +20,7 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this to a real password
+            'password': 'admin123',  # change this
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
@@ -59,7 +59,7 @@ def save_logins(logins):
 
 # Get persistent device ID from localStorage (created once)
 def get_device_id():
-    # JS to read/create persistent ID
+    # Use JS to read/create persistent ID
     st.components.v1.html("""
         <script>
         let deviceId = localStorage.getItem('johny_device_id');
@@ -71,7 +71,7 @@ def get_device_id():
         </script>
     """, height=0)
 
-    # Fallback in Python
+    # Fallback in Python if JS not run yet
     if 'device_id' not in st.session_state:
         st.session_state['device_id'] = str(uuid.uuid4())
     return st.session_state['device_id']
