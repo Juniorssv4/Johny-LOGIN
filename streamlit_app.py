@@ -22,12 +22,60 @@ credentials = {
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',  # plain password from signup email
+            'password': 'Junior76755782@',
             'email': 'phosis667@npaid.org'
         }
         # Add new users here with plain passwords
     }
 }
+
+# ───────────────────────────────────────────────
+# PERSISTENT LOGIN USING LOCALSTORAGE + ONE-TIME UUID
+# ───────────────────────────────────────────────
+def init_persistent_login():
+    # Run JS to create/read persistent UUID and username in localStorage
+    st.components.v1.html("""
+        <script>
+        // Generate or get persistent device UUID
+        let deviceId = localStorage.getItem('johny_device_id');
+        if (!deviceId) {
+            deviceId = crypto.randomUUID();
+            localStorage.setItem('johny_device_id', deviceId);
+        }
+
+        // Send device ID and saved username to Streamlit
+        parent.postMessage({
+            type: 'persistent_login_data',
+            deviceId: deviceId,
+            username: localStorage.getItem('johny_logged_in_username') || ''
+        }, "*");
+        </script>
+    """, height=0)
+
+# Call once on load
+init_persistent_login()
+
+# Receive data from JS via query params (Streamlit can't directly read localStorage)
+# But since we can't receive postMessage directly, we use a trick with session state
+if 'persistent_username' not in st.session_state:
+    st.session_state['persistent_username'] = None
+
+# On login success, save to localStorage
+if "just_logged_in" in st.session_state:
+    username = st.session_state["username"]
+    st.components.v1.html(f"""
+        <script>
+        localStorage.setItem('johny_logged_in_username', '{username}');
+        </script>
+    """, height=0)
+    del st.session_state["just_logged_in"]
+
+# Auto-login if saved username is valid
+saved_username = st.session_state.get('persistent_username')
+if saved_username and saved_username in credentials['usernames']:
+    st.session_state["authentication_status"] = True
+    st.session_state["name"] = credentials['usernames'][saved_username]['name']
+    st.session_state["username"] = saved_username
 
 # ───────────────────────────────────────────────
 # LOGIN / SIGN UP PAGE
@@ -50,17 +98,13 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
+                    st.session_state["just_logged_in"] = True
                     if remember_me:
-                        # Save to localStorage (survives refresh/close/reopen)
-                        st.components.v1.html(f"""
-                            <script>
-                            localStorage.setItem('johny_logged_in_username', '{username}');
-                            </script>
-                        """, height=0)
+                        st.session_state['persistent_username'] = username
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username}"
                     st.write(log)
-                    st.rerun()  # Instant 1-click reload to show translator
+                    st.rerun()
                 else:
                     st.error("Incorrect password")
             else:
