@@ -9,6 +9,7 @@ from io import BytesIO
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
+import uuid
 
 # ───────────────────────────────────────────────
 # APPROVED USERS (plain passwords – testing/private use only)
@@ -17,12 +18,12 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this
+            'password': 'admin123',  # change this to a real password
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
             'name': 'Junior SSV4',
-            'password': 'Junior76755782@',
+            'password': 'Junior76755782@',  # plain password from signup email
             'email': 'phosis667@npaid.org'
         }
         # Add new users here with plain passwords
@@ -30,7 +31,7 @@ credentials = {
 }
 
 # ───────────────────────────────────────────────
-# PERSISTENT DEVICE ID (UUID once per browser/device)
+# PERSISTENT DEVICE ID (UUID once per browser/device, stored in localStorage)
 # ───────────────────────────────────────────────
 def get_persistent_device_id():
     # Use JS to read/create persistent UUID in localStorage
@@ -52,6 +53,13 @@ def get_persistent_device_id():
 
 device_id = get_persistent_device_id()
 
+# Load saved logged-in username from localStorage for this device
+saved_username = st.session_state.get(f"johny_logged_in_{device_id}", None)
+if saved_username and saved_username in credentials['usernames']:
+    st.session_state["authentication_status"] = True
+    st.session_state["name"] = credentials['usernames'][saved_username]['name']
+    st.session_state["username"] = saved_username
+
 # ───────────────────────────────────────────────
 # LOGIN / SIGN UP PAGE
 # ───────────────────────────────────────────────
@@ -64,6 +72,7 @@ if not st.session_state.get("authentication_status"):
         st.subheader("Login")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
+        remember_me = st.checkbox("Remember me on this device", value=True)
 
         if st.button("Login"):
             if username in credentials['usernames']:
@@ -72,12 +81,9 @@ if not st.session_state.get("authentication_status"):
                     st.session_state["authentication_status"] = True
                     st.session_state["name"] = user['name']
                     st.session_state["username"] = username
-                    # Save username to localStorage for this device
-                    st.components.v1.html(f"""
-                        <script>
-                        localStorage.setItem('johny_logged_in_username', '{username}');
-                        </script>
-                    """, height=0)
+                    if remember_me:
+                        # Save to localStorage for this device only
+                        st.session_state[f"johny_logged_in_{device_id}"] = username
                     st.success(f"Welcome {user['name']}! Loading translator...")
                     log = f"{datetime.now()} - Login: {username} (Device ID: {device_id})"
                     st.write(log)
