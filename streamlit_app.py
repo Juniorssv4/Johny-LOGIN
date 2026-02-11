@@ -9,6 +9,7 @@ from io import BytesIO
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
+import json
 
 # ───────────────────────────────────────────────
 # APPROVED USERS (plain passwords – testing/private use only)
@@ -17,7 +18,7 @@ credentials = {
     'usernames': {
         'admin': {
             'name': 'Admin',
-            'password': 'admin123',  # change this to a real password
+            'password': 'admin123',
             'email': 'sisouvanhjunior@gmail.com'
         },
         'juniorssv4': {
@@ -25,112 +26,74 @@ credentials = {
             'password': 'Junior76755782@',
             'email': 'phosis667@npaid.org'
         }
-        # Add new users here with plain passwords
     }
 }
 
-# ───────────────────────────────────────────────
-# REMEMBER ME: AUTO-FILL & AUTO-LOGIN FROM LOCALSTORAGE
-# ───────────────────────────────────────────────
-# Run JS to load saved credentials from localStorage
-st.components.v1.html("""
-    <script>
-    const savedUsername = localStorage.getItem('johny_remember_username');
-    const savedPassword = localStorage.getItem('johny_remember_password');
-    if (savedUsername && savedPassword) {
-        parent.postMessage({
-            type: 'remember_me_credentials',
-            username: savedUsername,
-            password: savedPassword
-        }, "*");
-    }
-    </script>
-""", height=0)
-
-# Receive saved credentials from JS
-if 'remember_username' not in st.session_state:
-    st.session_state['remember_username'] = None
-    st.session_state['remember_password'] = None
-
-# Auto-login if saved credentials are valid
-if st.session_state['remember_username'] and st.session_state['remember_password']:
-    username = st.session_state['remember_username']
-    password = st.session_state['remember_password']
-    if username in credentials['usernames']:
-        user = credentials['usernames'][username]
-        if password == user['password']:
-            st.session_state["authentication_status"] = True
-            st.session_state["name"] = user['name']
-            st.session_state["username"] = username
-            # Auto-submit login (silent)
-            st.success(f"Welcome back {user['name']}! Logging you in...")
-            st.rerun()
+# Load Firebase config from GitHub raw file
+FIREBASE_RAW_URL = "https://raw.githubusercontent.com/Juniorssv4/YOUR_MAIN_REPO_NAME/main/firebase_config.json"
+# Replace YOUR_MAIN_REPO_NAME with your actual repo name (e.g. Johny-LOGIN)
+try:
+    config_response = requests.get(FIREBASE_RAW_URL)
+    if config_response.status_code == 200:
+        FIREBASE_CONFIG = config_response.json()
+    else:
+        FIREBASE_CONFIG = None
+except:
+    FIREBASE_CONFIG = None
 
 # ───────────────────────────────────────────────
-# LOGIN / SIGN UP PAGE
+# LOCKED MODE LOGIN (always show login on load/refresh)
 # ───────────────────────────────────────────────
-if not st.session_state.get("authentication_status"):
-    st.title("Johny - Login / Sign Up")
+st.title("Johny - Login / Sign Up")
 
-    tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
+tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
 
-    with tab_login:
-        st.subheader("Login")
-        username = st.text_input("Username", value=st.session_state.get('remember_username', ''))
-        password = st.text_input("Password", type="password", value=st.session_state.get('remember_password', ''))
-        remember_me = st.checkbox("Remember me on this device (auto-login next time)", value=True)
+with tab_login:
+    st.subheader("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
 
-        if st.button("Login"):
-            if username in credentials['usernames']:
-                user = credentials['usernames'][username]
-                if password == user['password']:
-                    st.session_state["authentication_status"] = True
-                    st.session_state["name"] = user['name']
-                    st.session_state["username"] = username
-                    if remember_me:
-                        # Save to localStorage (plain text – for your private use only)
-                        st.components.v1.html(f"""
-                            <script>
-                            localStorage.setItem('johny_remember_username', '{username}');
-                            localStorage.setItem('johny_remember_password', '{password}');
-                            </script>
-                        """, height=0)
-                    st.success(f"Welcome {user['name']}! Loading translator...")
-                    log = f"{datetime.now()} - Login: {username}"
-                    st.write(log)
-                    st.rerun()
-                else:
-                    st.error("Incorrect password")
+    if st.button("Login"):
+        if username in credentials['usernames']:
+            user = credentials['usernames'][username]
+            if password == user['password']:
+                st.session_state["authentication_status"] = True
+                st.session_state["name"] = user['name']
+                st.session_state["username"] = username
+                st.success(f"Welcome {user['name']}! Loading translator...")
+                st.rerun()
             else:
-                st.error("Username not found")
+                st.error("Incorrect password")
+        else:
+            st.error("Username not found")
 
-    with tab_signup:
-        st.subheader("Sign Up (Request Approval)")
-        st.info("Sign up — request sent to sisouvanhjunior@gmail.com for approval.")
-        new_username = st.text_input("Choose username")
-        new_email = st.text_input("Your email")
-        new_password = st.text_input("Choose password", type="password")
-        confirm_password = st.text_input("Confirm password", type="password")
+with tab_signup:
+    st.subheader("Sign Up (Request Approval)")
+    st.info("Sign up — request sent to sisouvanhjunior@gmail.com for approval.")
+    new_username = st.text_input("Choose username")
+    new_email = st.text_input("Your email")
+    new_password = st.text_input("Choose password", type="password")
+    confirm_password = st.text_input("Confirm password", type="password")
 
-        if st.button("Sign Up"):
-            if new_password != confirm_password:
-                st.error("Passwords do not match")
-            elif new_username in credentials['usernames']:
-                st.error("Username already taken")
-            else:
-                msg = EmailMessage()
-                msg['Subject'] = "New Johny Signup Request"
-                msg['From'] = st.secrets["EMAIL_USER"]
-                msg['To'] = "sisouvanhjunior@gmail.com"
-                msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword: {new_password}\nApprove by adding to credentials['usernames'] with plain password.")
+    if st.button("Sign Up"):
+        if new_password != confirm_password:
+            st.error("Passwords do not match")
+        elif new_username in credentials['usernames']:
+            st.error("Username already taken")
+        else:
+            msg = EmailMessage()
+            msg['Subject'] = "New Johny Signup Request"
+            msg['From'] = st.secrets["EMAIL_USER"]
+            msg['To'] = "sisouvanhjunior@gmail.com"
+            msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword: {new_password}\nApprove by adding to credentials['usernames'] with plain password.")
 
-                try:
-                    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-                        smtp.login(st.secrets["EMAIL_USER"], st.secrets["EMAIL_PASS"])
-                        smtp.send_message(msg)
-                    st.success("Request sent! Wait for admin approval.")
-                except Exception as e:
-                    st.error(f"Email failed: {str(e)}")
+            try:
+                with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+                    smtp.login(st.secrets["EMAIL_USER"], st.secrets["EMAIL_PASS"])
+                    smtp.send_message(msg)
+                st.success("Request sent! Wait for admin approval.")
+            except Exception as e:
+                st.error(f"Email failed: {str(e)}")
 
 else:
     # ───────────────────────────────────────────────
@@ -325,10 +288,4 @@ Text: {text}"""
     # Logout button (1-click, instant return to login)
     if st.button("Logout"):
         st.session_state["authentication_status"] = False
-        st.components.v1.html("""
-            <script>
-            localStorage.removeItem('johny_remember_username');
-            localStorage.removeItem('johny_remember_password');
-            </script>
-        """, height=0)
         st.rerun()
