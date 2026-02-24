@@ -1,350 +1,217 @@
 import streamlit as st
-import smtplib
-from email.message import EmailMessage
-from datetime import datetime
+import time
 import google.generativeai as genai
-from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 import requests
 from io import BytesIO
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
-import json
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 import uuid
 
-# ───────────────────────────────────────────────
-# APPROVED USERS (plain passwords – testing/private use only)
-# ───────────────────────────────────────────────
-credentials = {
-    'usernames': {
-        'admin': {
-            'name': 'Admin',
-            'password': 'admin123',  # change this
-            'email': 'sisouvanhjunior@gmail.com'
-        },
-        'juniorssv4': {
-            'name': 'Junior SSV4',
-            'password': 'Junior76755782@',
-            'email': 'phosis667@npaid.org'
-        }
-        # Add new users here with plain passwords
-    }
-}
-
-# Firebase setup (loaded from secrets or GitHub – use whichever you have)
-# If you put firebase_config.json in GitHub, use this:
-FIREBASE_RAW_URL = "https://raw.githubusercontent.com/Juniorssv4/YOUR_REPO_NAME/main/firebase_config.json"
-# CHANGE YOUR_REPO_NAME to your actual repo (e.g. Johny-LOGIN)
-
+# GEMINI CONFIG
 try:
-    config_response = requests.get(FIREBASE_RAW_URL)
-    if config_response.status_code == 200:
-        FIREBASE_CONFIG = config_response.json()
-    else:
-        FIREBASE_CONFIG = st.secrets.get("FIREBASE_CONFIG", None)
-except:
-    FIREBASE_CONFIG = st.secrets.get("FIREBASE_CONFIG", None)
-
-if FIREBASE_CONFIG is None:
-    st.warning("Firebase config not loaded – persistence disabled.")
-
-if FIREBASE_CONFIG:
-    FIREBASE_URL = f"{FIREBASE_CONFIG['databaseURL']}/logins.json"
-else:
-    FIREBASE_URL = None
-
-# Persistent device ID (UUID once per device/browser, stored in localStorage)
-def get_device_id():
-    st.components.v1.html("""
-        <script>
-        let deviceId = localStorage.getItem('johny_device_id');
-        if (!deviceId) {
-            deviceId = crypto.randomUUID();
-            localStorage.setItem('johny_device_id', deviceId);
-        }
-        parent.postMessage({type: 'device_id', value: deviceId}, "*");
-        </script>
-    """, height=0)
-
-    if 'device_id' not in st.session_state:
-        st.session_state['device_id'] = str(uuid.uuid4())
-    return st.session_state['device_id']
-
-device_id = get_device_id()
-
-# Load logins from Firebase
-logins = {}
-if FIREBASE_URL:
-    try:
-        r = requests.get(FIREBASE_URL)
-        logins = r.json() if r.status_code == 200 else {}
-    except:
-        logins = {}
-
-# Auto-login if device is saved in Firebase
-if device_id in logins:
-    username = logins[device_id]
-    if username in credentials['usernames']:
-        st.session_state["authentication_status"] = True
-        st.session_state["name"] = credentials['usernames'][username]['name']
-        st.session_state["username"] = username
-
-# ───────────────────────────────────────────────
-# LOGIN / SIGN UP PAGE
-# ───────────────────────────────────────────────
-if not st.session_state.get("authentication_status"):
-    st.title("Johny - Login / Sign Up")
-
-    tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
-
-    with tab_login:
-        st.subheader("Login")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-
-        if st.button("Login"):
-            if username in credentials['usernames']:
-                user = credentials['usernames'][username]
-                if password == user['password']:
-                    st.session_state["authentication_status"] = True
-                    st.session_state["name"] = user['name']
-                    st.session_state["username"] = username
-                    # Save to Firebase
-                    if FIREBASE_URL:
-                        logins = load_logins()
-                        logins[device_id] = username
-                        requests.put(FIREBASE_URL, json=logins)
-                    st.success(f"Welcome {user['name']}! Loading translator...")
-                    st.rerun()
-                else:
-                    st.error("Incorrect password")
-            else:
-                st.error("Username not found")
-
-    with tab_signup:
-        st.subheader("Sign Up (Request Approval)")
-        st.info("Sign up — request sent to sisouvanhjunior@gmail.com for approval.")
-        new_username = st.text_input("Choose username")
-        new_email = st.text_input("Your email")
-        new_password = st.text_input("Choose password", type="password")
-        confirm_password = st.text_input("Confirm password", type="password")
-
-        if st.button("Sign Up"):
-            if new_password != confirm_password:
-                st.error("Passwords do not match")
-            elif new_username in credentials['usernames']:
-                st.error("Username already taken")
-            else:
-                msg = EmailMessage()
-                msg['Subject'] = "New Johny Signup Request"
-                msg['From'] = st.secrets["EMAIL_USER"]
-                msg['To'] = "sisouvanhjunior@gmail.com"
-                msg.set_content(f"New signup:\nUsername: {new_username}\nEmail: {new_email}\nPassword: {new_password}\nApprove by adding to credentials['usernames'] with plain password.")
-
-                try:
-                    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-                        smtp.login(st.secrets["EMAIL_USER"], st.secrets["EMAIL_PASS"])
-                        smtp.send_message(msg)
-                    st.success("Request sent! Wait for admin approval.")
-                except Exception as e:
-                    st.error(f"Email failed: {str(e)}")
-
-else:
-    # ───────────────────────────────────────────────
-    # JOHNY TRANSLATOR (after login)
-    # ───────────────────────────────────────────────
-
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    PRIMARY_MODEL = "gemini-2.5-flash"
-    FALLBACK_MODEL = "gemini-1.5-flash"
+except:
+    st.error("Add GEMINI_API_KEY in Secrets")
+    st.stop()
 
-    if "current_model" not in st.session_state:
-        st.session_state.current_model = PRIMARY_MODEL
+# Primary and fallback models
+PRIMARY_MODEL = "gemini-2.5-flash"
+FALLBACK_MODEL = "gemini-1.5-flash"
 
-    model = genai.GenerativeModel(st.session_state.current_model)
+if "current_model" not in st.session_state:
+    st.session_state.current_model = PRIMARY_MODEL
 
-    @retry(stop=stop_after_attempt(6), wait=wait_exponential(multiplier=1, min=4, max=60))
-    def safe_generate_content(prompt):
-        return model.generate_content(prompt)
+model = genai.GenerativeModel(st.session_state.current_model)
 
-    # Glossary
-    if "glossary" not in st.session_state:
-        try:
-            raw_url = "https://raw.githubusercontent.com/Juniorssv4/Johny-LOGIN/main/glossary.txt"
-            response = requests.get(raw_url)
-            response.raise_for_status()
-            lines = response.text.splitlines()
-            glossary_dict = {}
-            for line in lines:
-                line = line.strip()
-                if line and ":" in line:
-                    eng, lao = line.split(":", 1)
-                    glossary_dict[eng.strip().lower()] = lao.strip()
-            st.session_state.glossary = glossary_dict
-        except:
-            st.session_state.glossary = {}
+# Backoff for rate limits
+@retry(
+    stop=stop_after_attempt(6),
+    wait=wait_exponential(multiplier=1, min=4, max=60)
+)
+def safe_generate_content(prompt):
+    return model.generate_content(prompt)
 
-    glossary = st.session_state.glossary
+# Glossary from repo file – FORCE FRESH LOAD EVERY TIME, NO CACHE
+try:
+    # Super strong cache-bust to break GitHub CDN and browser cache
+    cache_bust = f"{int(time.time() * 1000)}_{str(uuid.uuid4())[:8]}_{str(hash(str(time.time())))[-6:]}"
+    raw_url = f"https://raw.githubusercontent.com/Juniorssv4/johny-final/main/glossary.txt?cachebust={cache_bust}"
+    response = requests.get(raw_url, timeout=10)
+    response.raise_for_status()
+    lines = response.text.splitlines()
+    glossary_dict = {}
+    for line in lines:
+        line = line.strip()
+        if line and ":" in line:
+            parts = line.split(":", 1)
+            eng = parts[0].strip().lower()
+            lao = parts[1].strip() if len(parts) > 1 else ""
+            glossary_dict[eng] = lao
+    glossary = glossary_dict
+except Exception as e:
+    glossary = {}
+    st.error(f"Glossary load failed: {str(e)}")
 
-    def get_glossary_prompt():
-        if glossary:
-            terms = "\n".join([f"• {e.capitalize()} → {l}" for e, l in glossary.items()])
-            return f"Use EXACTLY these terms:\n{terms}\n"
+def get_glossary_prompt():
+    if glossary:
+        terms = "\n".join([f"• {e.capitalize()} → {l}" for e, l in glossary.items()])
+        return f"Use EXACTLY these terms:\n{terms}\n"
+    return ""
+
+def translate_text(text, direction):
+    if not text.strip():
         return ""
-
-    def translate_text(text, direction):
-        if not text.strip():
-            return ""
-        target = "Lao" if direction == "English → Lao" else "English"
-        prompt = f"""{get_glossary_prompt()}Translate ONLY the text to {target}.
+    target = "Lao" if direction == "English → Lao" else "English"
+    prompt = f"""{get_glossary_prompt()}Translate ONLY the text to {target}.
 Return ONLY the translation.
-
 Text: {text}"""
+    try:
+        response = safe_generate_content(prompt)
+        return response.text.strip()
+    except RetryError as e:
+        if "429" in str(e.last_attempt.exception()) or "quota" in str(e.last_attempt.exception()).lower():
+            if st.session_state.current_model == PRIMARY_MODEL:
+                st.session_state.current_model = FALLBACK_MODEL
+                st.info("Rate limit on gemini-2.5-flash — switched to gemini-1.5-flash.")
+                global model
+                model = genai.GenerativeModel(FALLBACK_MODEL)
+                response = model.generate_content(prompt)
+                return response.text.strip()
+        st.error("Timed out after retries — try again in 5 minutes.")
+        return "[Failed — try later]"
+    except Exception as e:
+        st.error(f"API error: {str(e)}")
+        return "[Failed — try again]"
 
-        try:
-            response = safe_generate_content(prompt)
-            return response.text.strip()
-        except RetryError as e:
-            if "429" in str(e.last_attempt.exception()) or "quota" in str(e.last_attempt.exception()).lower():
-                if st.session_state.current_model == PRIMARY_MODEL:
-                    st.session_state.current_model = FALLBACK_MODEL
-                    st.info("Rate limit — switched to fallback.")
-                    global model
-                    model = genai.GenerativeModel(FALLBACK_MODEL)
-                    response = model.generate_content(prompt)
-                    return response.text.strip()
-            st.error("Timed out — try later.")
-            return "[Failed — try later]"
-        except Exception as e:
-            st.error(f"API error: {str(e)}")
-            return "[Failed — try again]"
+# UI
+st.set_page_config(
+    page_title="Johny",
+    page_icon="https://raw.githubusercontent.com/Juniorssv4/johny-final/main/Johny.png",
+    layout="centered"
+)
 
-    st.title("😊 Johny — NPA Lao Translator")
+st.title("😊 Johny — NPA Lao Translator")
 
-    direction = st.radio("Direction", ["English → Lao", "Lao → English"], horizontal=True)
+direction = st.radio("Direction", ["English → Lao", "Lao → English"], horizontal=True)
 
-    tab1, tab2 = st.tabs(["Translate Text", "Translate File"])
+tab1, tab2 = st.tabs(["Translate Text", "Translate File"])
 
-    with tab1:
-        text = st.text_area("Enter text to translate", height=200)
-        if st.button("Translate Text", type="primary"):
-            with st.spinner("Translating..."):
-                result = translate_text(text, direction)
-                st.success("Translation:")
-                st.write(result)
+with tab1:
+    text = st.text_area("Enter text to translate", height=200)
+    if st.button("Translate Text", type="primary"):
+        with st.spinner("Translating..."):
+            result = translate_text(text, direction)
+            st.success("Translation:")
+            
+            # Show translated text
+            st.markdown("**Translated text:**")
+            st.code(result, language=None)
+            
+            # Copy button with JS + green success feedback
+            copy_js = f"""
+                <button onclick="navigator.clipboard.writeText(`{result.replace('`', '\\`').replace('"', '\\"')}`).then(() => {{
+                    document.getElementById('copy-success').style.display = 'block';
+                    setTimeout(() => {{ document.getElementById('copy-success').style.display = 'none'; }}, 3000);
+                }})">📋 Copy to Clipboard</button>
+                <p id="copy-success" style="color:green; display:none; margin-top:8px;">✅ Copied!</p>
+            """
+            st.components.v1.html(copy_js, height=60)
 
-    with tab2:
-        uploaded_file = st.file_uploader("Upload DOCX • XLSX • PPTX (max 50MB)", type=["docx", "xlsx", "pptx"])
-
-        if uploaded_file:
-            MAX_SIZE_MB = 50
-            if uploaded_file.size > MAX_SIZE_MB * 1024 * 1024:
-                st.error(f"File too large! Max {MAX_SIZE_MB}MB. Your file: {uploaded_file.size / (1024*1024):.1f}MB.")
-            elif st.button("Translate File", type="primary"):
-                with st.spinner("Translating file..."):
-                    file_bytes = uploaded_file.read()
-                    file_name = uploaded_file.name
-                    ext = file_name.rsplit(".", 1)[-1].lower()
-                    output = BytesIO()
-
-                    total_elements = 0
-                    elements_list = []
-
-                    if ext == "docx":
-                        doc = Document(BytesIO(file_bytes))
-                        for p in doc.paragraphs:
-                            if p.text.strip():
-                                total_elements += 1
-                                elements_list.append(("para", p))
-                        for table in doc.tables:
-                            for row in table.rows:
-                                for cell in row.cells:
-                                    for p in cell.paragraphs:
-                                        if p.text.strip():
-                                            total_elements += 1
-                                            elements_list.append(("para", p))
-
-                    elif ext == "xlsx":
-                        wb = load_workbook(BytesIO(file_bytes))
-                        for ws in wb.worksheets:
-                            for row in ws.iter_rows():
-                                for cell in row:
-                                    if isinstance(cell.value, str) and cell.value.strip():
+with tab2:
+    uploaded_file = st.file_uploader("Upload DOCX • XLSX • PPTX (max 50MB)", type=["docx", "xlsx", "pptx"])
+    if uploaded_file:
+        MAX_SIZE_MB = 50
+        if uploaded_file.size > MAX_SIZE_MB * 1024 * 1024:
+            st.error(f"File too large! Max allowed size is {MAX_SIZE_MB}MB. Your file is {uploaded_file.size / (1024*1024):.1f}MB.")
+        elif st.button("Translate File", type="primary"):
+            with st.spinner("Translating file..."):
+                file_bytes = uploaded_file.read()
+                file_name = uploaded_file.name
+                ext = file_name.rsplit(".", 1)[-1].lower()
+                output = BytesIO()
+                total_elements = 0
+                elements_list = []
+                if ext == "docx":
+                    doc = Document(BytesIO(file_bytes))
+                    for p in doc.paragraphs:
+                        if p.text.strip():
+                            total_elements += 1
+                            elements_list.append(("para", p))
+                    for table in doc.tables:
+                        for row in table.rows:
+                            for cell in row.cells:
+                                for p in cell.paragraphs:
+                                    if p.text.strip():
                                         total_elements += 1
-                                        elements_list.append(("cell", cell))
+                                        elements_list.append(("para", p))
+                elif ext == "xlsx":
+                    wb = load_workbook(BytesIO(file_bytes))
+                    for ws in wb.worksheets:
+                        for row in ws.iter_rows():
+                            for cell in row:
+                                if isinstance(cell.value, str) and cell.value.strip():
+                                    total_elements += 1
+                                    elements_list.append(("cell", cell))
+                elif ext == "pptx":
+                    prs = Presentation(BytesIO(file_bytes))
+                    for slide in prs.slides:
+                        for shape in slide.shapes:
+                            if shape.has_text_frame:
+                                for p in shape.text_frame.paragraphs:
+                                    if p.text.strip():
+                                        total_elements += 1
+                                        elements_list.append(("para", p))
+                if total_elements == 0:
+                    st.warning("No text found in file.")
+                    st.stop()
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                translated_count = 0
+                for element_type, element in elements_list:
+                    status_text.text(f"Translating... {translated_count}/{total_elements}")
+                    if element_type == "para":
+                        translated = translate_text(element.text, direction)
+                        element.text = translated
+                    elif element_type == "cell":
+                        translated = translate_text(element.value, direction)
+                        element.value = translated
+                    translated_count += 1
+                    progress_bar.progress(translated_count / total_elements)
+                status_text.text("Saving file...")
+                if ext == "docx":
+                    doc.save(output)
+                elif ext == "xlsx":
+                    wb.save(output)
+                elif ext == "pptx":
+                    prs.save(output)
+                output.seek(0)
+                filename = f"TRANSLATED_{file_name}"
+                mime_type = "application/octet-stream"
+                st.success("Translation complete!")
+                st.info("Click the big button below to download your translated file. Your browser may block auto-downloads — this button always works!")
+                st.download_button(
+                    label="📥 DOWNLOAD TRANSLATED FILE NOW",
+                    data=output,
+                    file_name=filename,
+                    mime=mime_type,
+                    type="primary",
+                    use_container_width=True,
+                    key="download_btn_" + str(time.time()),
+                    help="Click here to save the translated file to your device"
+                )
+                st.caption("Tip: If nothing happens, refresh the page or try in another browser (Chrome works best).")
 
-                    elif ext == "pptx":
-                        prs = Presentation(BytesIO(file_bytes))
-                        for slide in prs.slides:
-                            for shape in slide.shapes:
-                                if shape.has_text_frame:
-                                    for p in shape.text_frame.paragraphs:
-                                        if p.text.strip():
-                                            total_elements += 1
-                                            elements_list.append(("para", p))
+# Teach term (manual in GitHub)
+with st.expander("➕ Teach Johny a new term (edit glossary.txt in GitHub)"):
+    st.info("To add term: Edit glossary.txt in repo → add line 'english:lao' → save → click the red reload button below or refresh page.")
+    st.code("Example:\nSamir:ສະຫມີຣ\nhello:ສະບາຍດີ")
 
-                    if total_elements == 0:
-                        st.warning("No text found.")
-                        st.stop()
+# Big red manual reload button – click this RIGHT AFTER you commit changes to glossary.txt
+st.markdown("---")
+st.markdown("<h3 style='color:red;'>If you just edited glossary.txt on GitHub, click this button now:</h3>", unsafe_allow_html=True)
+if st.button("🔴 RELOAD GLOSSARY FROM GITHUB (click after editing & committing)", type="primary", use_container_width=True):
+    st.rerun()
 
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-
-                    translated_count = 0
-
-                    for element_type, element in elements_list:
-                        status_text.text(f"Translating... {translated_count}/{total_elements}")
-
-                        if element_type == "para":
-                            translated = translate_text(element.text, direction)
-                            element.text = translated
-                        elif element_type == "cell":
-                            translated = translate_text(element.value, direction)
-                            element.value = translated
-
-                        translated_count += 1
-                        progress_bar.progress(translated_count / total_elements)
-
-                    status_text.text("Saving file...")
-                    if ext == "docx":
-                        doc.save(output)
-                    elif ext == "xlsx":
-                        wb.save(output)
-                    elif ext == "pptx":
-                        prs.save(output)
-
-                    output.seek(0)
-
-                    filename = f"TRANSLATED_{file_name}"
-                    mime_type = "application/octet-stream"
-
-                    st.success("Translation complete!")
-                    st.info("Click below to download.")
-
-                    st.download_button(
-                        label="📥 DOWNLOAD TRANSLATED FILE NOW",
-                        data=output,
-                        file_name=filename,
-                        mime=mime_type,
-                        type="primary",
-                        use_container_width=True,
-                        key="download_" + str(time.time())
-                    )
-
-                    st.caption("Tip: Refresh or use Chrome if needed.")
-
-    with st.expander("➕ Teach Johny a new term"):
-        st.info("Edit glossary.txt in repo → add 'english:lao' → save.")
-        st.code("Example:\nUXO:ລບຕ")
-
-    st.caption(f"Glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
-
-    # Logout button (1-click, instant return to login)
-    if st.button("Logout"):
-        st.session_state["authentication_status"] = False
-        # Optional: remove from Firebase
-        if FIREBASE_URL:
-            logins = load_logins()
-            logins.pop(device_id, None)
-            requests.put(FIREBASE_URL, json=logins)
-        st.rerun()
+st.caption(f"Active glossary: {len(glossary)} terms • Model: {st.session_state.current_model}")
